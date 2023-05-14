@@ -39,23 +39,23 @@ const handler = async (req: Request): Promise<Response> => {
   // console.log("input: ", input);
 
   const apiKey = process.env.OPENAI_API_KEY;
-  
-  const apiURL = process.env.OPENAI_PROXY == "" ? "https://api.openai.com" : process.env.OPENAI_PROXY;
 
-  const embeddingResponse = await fetch(
-    apiURL + "/v1/embeddings",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        input,
-        model: "text-embedding-ada-002"
-      })
-    }
-  );
+  const apiURL =
+    process.env.OPENAI_PROXY == ""
+      ? "https://api.openai.com"
+      : process.env.OPENAI_PROXY;
+
+  const embeddingResponse = await fetch(apiURL + "/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      input,
+      model: "text-embedding-ada-002"
+    })
+  });
 
   const embeddingData = await embeddingResponse.json();
   const [{ embedding }] = embeddingData.data;
@@ -96,41 +96,40 @@ const handler = async (req: Request): Promise<Response> => {
     }
   }
 
+  console.log(tokenCount);
+
   // console.log("contextText: ", contextText);
 
-  const systemContent = `You are a helpful assistant. When given CONTEXT you answer questions using only that information,
-  and you always format your output in markdown. You include code snippets if relevant. If you are unsure and the answer
-  is not explicitly written in the CONTEXT provided, you say
-  "Sorry, I don't know how to help with that."  If the CONTEXT includes 
-  source URLs include them under a SOURCES heading at the end of your response. Always include all of the relevant source urls 
-  from the CONTEXT, but never list a URL more than once (ignore trailing forward slashes when comparing for uniqueness). Never include URLs that are not in the CONTEXT sections. Never make up URLs`;
+  const systemContent =
+    stripIndent(`You are an expert scientist in neuroscience. The CONTEXT is an excerpt from a scientific paper.
+  Use CONTEXT as an extension to your training data. You can use your general scientific knowledge in addition to CONTEXT. Think step-by-step on how CONTEXT can be used to clarify and increase the detail of your answer. Be thorough, rigorous, and always provide evidence to support your claims. You are especially good at making points clear. Use precise language and incorporate relevant technical terms or jargon, as this will be helpful in understanding the subject matter. Keep relevant citation information.
+  If you are unsure, you say "Sorry, I don't know."
 
-  const userContent = `CONTEXT:
-  Next.js is a React framework for creating production-ready web applications. It provides a variety of methods for fetching data, a built-in router, and a Next.js Compiler for transforming and minifying JavaScript code. It also includes a built-in Image Component and Automatic Image Optimization for resizing, optimizing, and serving images in modern formats.
-  SOURCE: nextjs.org/docs/faq
-  
-  QUESTION: 
-  what is nextjs?    
-  `;
+  The CONTEXT includes source URLs, always include them under a SOURCES heading at the end of your response. Always include all of the relevant source urls from the CONTEXT, but never list a URL more than once (ignore trailing forward slashes when comparing for uniqueness). Never include URLs that are not in the CONTEXT sections. Never make up URLs.`);
 
-  const assistantContent = `Next.js is a framework for building production-ready web applications using React. It offers various data fetching options, comes equipped with an integrated router, and features a Next.js compiler for transforming and minifying JavaScript. Additionally, it has an inbuilt Image Component and Automatic Image Optimization that helps resize, optimize, and deliver images in modern formats.
-  
-  \`\`\`js
-  function HomePage() {
-    return <div>Welcome to Next.js!</div>
-  }
-  
-  export default HomePage
-  \`\`\`
-  
+  const userContent = stripIndent(`CONTEXT:
+  Hypothalamic tanycytes are radial glial cells that line the ventricular walls of the mediobasal third ventricle (1, 2). Tanycytes are subdivided into alpha1, alpha2, beta1, and beta2 subtypes based on dorsoventral position and marker gene expression and closely resemble neural progenitors in morphology and gene expression profile. Tanycytes have been reported to generate small numbers of neurons and glia in the postnatal period, although at much lower levels than in more extensively characterized sites of ongoing neurogenesis, such as the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus (3–6).
+  SOURCE: https://www.science.org/doi/full/10.1126/sciadv.abg3777
+  ---
+
+
+  QUESTION:
+  what are tanycytes and why are they important?
+  `);
+
+  const assistantContent =
+    stripIndent(`Tanycytes are a specific type of radial glial cells located in the hypothalamus, lining the ventricular walls of the mediobasal third ventricle. The importance of tanycytes lies in their reported capacity to generate neurons and glia, though at much lower levels compared to other well-characterized neurogenic sites like the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus. Despite the relatively low levels of postnatal neurogenesis, the neurons generated from tanycytes, referred to as tanycyte-derived neurons (TDNs), may have significant roles in regulating various behaviors. However, due to the low and almost undetectable levels of tanycyte-derived neurogenesis in adulthood, the specifics regarding the identity and connectivity of TDNs are not well understood.
+
+  A point of interest in the study of tanycytes is their similarity to retinal Müller glia in terms of morphology and gene expression. Müller glia, particularly in zebrafish, act as quiescent neural stem cells capable of regenerating every major retinal cell type after injury. The study of these cells provides valuable insights into the neurogenic potential of tanycytes.
+
   SOURCES:
-  https://nextjs.org/docs/faq`;
+  https://www.science.org/doi/full/10.1126/sciadv.abg3777`);
 
   const userMessage = `CONTEXT:
   ${contextText}
-  
-  USER QUESTION: 
-  ${query}  
+
+  USER QUESTION:
+  ${query}
   `;
 
   const messages = [
@@ -152,11 +151,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
   ];
 
-
   console.log("messages: ", messages);
 
   const payload: OpenAIStreamPayload = {
-    model: "gpt-3.5-turbo-0301",
+    model: "gpt-3.5-turbo",
     messages: messages,
     temperature: 0,
     top_p: 1,
