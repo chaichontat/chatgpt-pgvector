@@ -78,7 +78,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
         url=""
       />
       <div className="flex flex-col items-center justify-center min-h-screen py-2 mx-auto">
-   
+
 
         <main className="flex flex-col items-center justify-center flex-1 w-full min-h-screen px-4 py-2 mx-auto mt-12 text-center sm:mt-20">
           <h1 className="max-w-xl text-2xl font-bold sm:text-4xl">
@@ -144,7 +144,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
                           >
                             {index === 0 ? (
                             <MarkdownRenderer content={splitanswer.trim()} />
-                            
+
                             ) : (
                               <>
                                 <p>SOURCES:</p>
@@ -154,12 +154,12 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
                                     .split("\n")
                                     .filter((url) => url.trim().length > 0)
                                     .map((url) =>
-                                      url.includes("http") ? (
+                                      url.includes("/") ? (
                                         <li key={uuidv4()}>
                                         <a
                                             className="underline text-accent"
-                                            target="_blank" 
-                                            href={url.replace(/^-+/g, '')} // Remove leading hyphens
+                                            target="_blank"
+                                            href={'https://doi.org/' + url.replace(/^-+/g, '')} // Remove leading hyphens
                                             >
                                             {url.replace(/^-+/g, '')}
                                           </a>
