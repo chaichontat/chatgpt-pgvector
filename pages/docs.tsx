@@ -82,7 +82,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
 
         <main className="flex flex-col items-center justify-center flex-1 w-full min-h-screen px-4 py-2 mx-auto mt-12 text-center sm:mt-20">
           <h1 className="max-w-xl text-2xl font-bold sm:text-4xl">
-            Ask me anything<sup>*</sup>  about web development!
+            Ask me anything<sup>*</sup> about science!
           </h1>
           <div className="w-full max-w-xl">
             <textarea
@@ -95,7 +95,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
 
             {!loading && (
               <button
-                className="w-full px-4 py-2 mt-2 font-mediu btn btn-primary"
+                className="w-full px-4 py-2 mt-2 font-medium btn btn-primary"
                 onClick={(e) => generateAnswer(e)}
               >
                 Ask your question &rarr;
@@ -103,7 +103,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
             )}
             {loading && (
               <button
-                className="w-full px-4 py-2 mt-2 font-mediu btn btn-primary"
+                className="w-full px-4 py-2 mt-2 font-medium btn btn-primary"
                 disabled
               >
                 <LoadingDots color="white" style="xl" />
@@ -124,7 +124,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
                         Here is your answer:{" "}
                       </h2>
                     </div>
-                      {answer.split("SOURCES:").map((splitanswer, index) => {
+                      {answer.split(/SOURCES?:/).map((splitanswer, index) => {
                         return (
                           <div
                             className={`p-4 transition bg-neutral border border-neutral-focus shadow-md rounded-xl overflow-x-auto max-w-xl ${
@@ -187,16 +187,6 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
             </AnimatePresence>
           </ResizablePanel>
 
-          <div className="max-w-xl text-xs">
-            <p><sup>*</sup>Actually, I'm currently only trained on the following documentation:</p>
-            <ul>
-              <li><a target="_blank" href="">https://beta.reactjs.org/</a></li>
-              <li><a target="_blank" href="">https://supabase.com/docs</a></li>
-              <li><a target="_blank" href="">https://tailwindcss.com/docs</a></li>
-              <li><a target="_blank" href="">https://nextjs.org/docs</a></li>
-              <li><a target="_blank" href="">https://beta.nextjs.org/docs</a></li>
-            </ul>
-            </div>
 
           </div>
         </main>
