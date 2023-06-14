@@ -70,11 +70,18 @@ const handler = async (req: Request): Promise<Response> => {
     {
       query_embedding: embedding,
       similarity_threshold: 0.1, // Choose an appropriate threshold for your data
-      match_count: 20 // Choose the number of matches
+      match_count: 40 // Choose the number of matches
     }
   );
 
   console.log("documents:", documents);
+  const _dois: string[] = Array.from(
+    new Set(documents.map((doc: { doi: string }) => doc.doi))
+  );
+  const dois: Record<string, number> = {};
+  for (const [i, doi] of _dois.entries()) {
+    dois[doi] = i;
+  }
 
   // if (error) console.error(error);
 
@@ -89,15 +96,26 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response({ error: "No documents found" }, { status: 404 });
   }
 
+  const individualLimit = 50;
+  const counts: Record<string, number> = {};
+
   for (let i = 0; i < documents.length; i++) {
     const document = documents[i];
     const content = document.content;
     const doi = document.doi;
+    if (!(doi in counts)) {
+      counts[doi] = 0;
+    } else {
+      counts[doi] += 1;
+    }
+    if (counts[doi] > individualLimit) {
+      continue;
+    }
     const encoded = tokenizer.encode(content);
     tokenCount += encoded.text.length;
 
     // Limit context to max 1500 tokens (configurable)
-    if (tokenCount > 2200) {
+    if (tokenCount > 8000) {
       break;
     }
 
@@ -109,13 +127,18 @@ const handler = async (req: Request): Promise<Response> => {
   // console.log("contextText: ", contextText);
 
   const systemContent =
-    stripIndent(`"You are a research assistant who values factuality and ensuring that you provide answers that strictly match with evidence. Your goal is to answer QUESTION thoroughly and correctly using as much of the CONTEXT as possible.
-    Don't worry about concise answers, you can be verbose. Throw about as much information as you can at the question.
-  Think step-by-step on how CONTEXT can be used to clarify and increase the detail of your answer. You must absolutely ensure the reference matches what you say in the answer.
-  Use precise language and incorporate relevant technical terms or jargon as the audience is an expert scientist. Do not pontificate with "it is important to note...". Be direct and factual.
+    stripIndent(`"You are a research assistant who values precision and factuality and ensuring that you provide answers that strictly match with evidence.
+  You will only reply in a straightforward manner. Never say "as an AI language model"; never use hedging language like "but remember that", never tack on "However, note that..." or "Remember that..." or "Please note that...", or "it is important to note that ..." or anything similar at the ends of replies.
+  Your goal is to answer QUESTION thoroughly and correctly using as much of the CONTEXT as possible.
+  Don't worry about concise answers, you can be very detailed. Include as much information as you can.
+  Think step-by-step on how CONTEXT can be used to clarify and increase the detail of your answer.
+  You must absolutely ensure the reference matches what you say in the answer.
+  Use precise language and incorporate relevant technical terms or jargon as the reader is an expert scientist and does not appreciate layman's terms or vague/general language.
+  Do not include a summary (i.e. overall...). I want only facts. Be direct.
   If you are unsure, you say "Sorry, I don't know."
-
-  The CONTEXT includes DOIs, always include them under a SOURCES heading at the end of your response. Always list all DOIs from the CONTEXT, but never list a DOI more than once. Never include DOIs that are not in the CONTEXT sections.`);
+  The CONTEXT includes DOIs, always include them under a SOURCES heading at the end of your response.
+  Always list all DOIs from the CONTEXT, but never list a DOI more than once.
+  Never include DOIs that are not in the CONTEXT sections.`);
 
   const userContent = stripIndent(`CONTEXT:
   From this reference, hypothalamic tanycytes are radial glial cells that line the ventricular walls of the mediobasal third ventricle. Tanycytes are subdivided into alpha1, alpha2, beta1, and beta2 subtypes based on dorsoventral position and marker gene expression and closely resemble neural progenitors in morphology and gene expression profile. Tanycytes have been reported to generate small numbers of neurons and glia in the postnatal period, although at much lower levels than in more extensively characterized sites of ongoing neurogenesis, such as the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus.
@@ -129,10 +152,10 @@ const handler = async (req: Request): Promise<Response> => {
   const assistantContent =
     stripIndent(`Tanycytes are a specific type of radial glial cells located in the hypothalamus, lining the ventricular walls of the mediobasal third ventricle. The importance of tanycytes lies in their reported capacity to generate neurons and glia, though at much lower levels compared to other well-characterized neurogenic sites like the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus. Despite the relatively low levels of postnatal neurogenesis, the neurons generated from tanycytes, referred to as tanycyte-derived neurons (TDNs), may have significant roles in regulating various behaviors.
 
-  A point of interest in the study of tanycytes is their similarity to retinal Müller glia in terms of morphology and gene expression. Müller glia, particularly in zebrafish, act as quiescent neural stem cells capable of regenerating every major retinal cell type after injury. The study of these cells provides valuable insights into the neurogenic potential of tanycytes.
+A point of interest in the study of tanycytes is their similarity to retinal Müller glia in terms of morphology and gene expression. Müller glia, particularly in zebrafish, act as quiescent neural stem cells capable of regenerating every major retinal cell type after injury. The study of these cells provides valuable insights into the neurogenic potential of tanycytes.
 
-  SOURCES:
-  10.1126/sciadv.abg3777`);
+SOURCES:
+10.1126/sciadv.abg3777`);
 
   const userMessage = `CONTEXT:
   ${contextText}
@@ -163,7 +186,7 @@ const handler = async (req: Request): Promise<Response> => {
   console.log("messages: ", messages);
 
   const payload: OpenAIStreamPayload = {
-    model: "gpt-3.5-turbo",
+    model: "gpt-3.5-turbo-16k",
     messages: messages,
     temperature: 0.3,
     top_p: 1,

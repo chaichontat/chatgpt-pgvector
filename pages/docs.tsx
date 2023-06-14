@@ -159,7 +159,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
                                         <a
                                             className="underline text-accent"
                                             target="_blank"
-                                            href={'https://doi.org/' + url.replace(/^-+/g, '')} // Remove leading hyphens
+                                            href={'https://doi.org/' + url.replace(/^[-\s]+/g, '')} // Remove leading hyphens
                                             >
                                             {url.replace(/^-+/g, '')}
                                           </a>
