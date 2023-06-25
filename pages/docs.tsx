@@ -11,19 +11,20 @@ import { PageMeta } from "../types";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { use } from "react";
 import { Link } from "@/components/Links";
+import Embeddings from "./embeddings";
 
 interface Props {
   children: ReactNode;
   meta?: PageMeta;
 }
 
-const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
+const DocsPage: NextPage<Props> = () => {
   const [loading, setLoading] = useState(false);
   const [userQ, setUserQ] = useState("");
   const [keyword, setKeyword] = useState("");
   const [answer, setAnswer] = useState<String>("");
-  const [maxChunks, setMaxChunks] = useState(5);
-
+  const [maxChunks, setMaxChunks] = useState(8);
+  const [fakeAnswer, setFakeAnswer] = useState(false)
   const question = userQ;
 
   const generateAnswer = async (e: any) => {
@@ -42,7 +43,8 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
       body: JSON.stringify({
         question,
         keyword,
-        maxChunks
+        maxChunks,
+        useFakeAnswer: fakeAnswer
       })
     });
     console.log("Edge function returned.");
@@ -74,8 +76,8 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
   return (
     <>
       <MetaTags
-        title="Webdev Answerbot"
-        description="Web Developer answer-bot trained on Supabase, Nextjs, React, TailwindCSS."
+        title="Science Answerbot"
+        description="Science answer-bot."
         cardImage="/bot/docs-og.png"
         url=""
       />
@@ -95,7 +97,7 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
               }
             />
 
-            <div className="grid grid-cols-3 mb-4 space-x-3">
+            <div className="grid grid-cols-3  space-x-3 mb-2">
               <div className="col-span-2">
                 <span className="text-left text-sm">
                   Keyword(s) separated by comma
@@ -118,6 +120,13 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
                 />
               </div>
             </div>
+            <span className="flex gap-x-1 items-center text-sm mb-4">
+              <input type="checkbox" checked={fakeAnswer}
+                onChange={(e) => setFakeAnswer(e.target.checked)}
+              />
+              Use fake answer prompting (slower but may give more related results)
+            </span>
+
             {!loading && (
               <button
                 className="w-full px-4 py-2 mt-2 font-medium btn btn-primary"
@@ -199,6 +208,11 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
           </div>
         </main>
       </div>
+      {/* // draw a line across the page with length of 80% */}
+      <div className="w-4/5 mx-auto my-10 border-b border-white/0"></div>
+
+
+      <Embeddings />
     </>
   );
 };

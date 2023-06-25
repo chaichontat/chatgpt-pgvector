@@ -3,6 +3,7 @@ import { useState } from "react";
 import ResizablePanel from "@/components/ResizablePanel";
 import { AnimatePresence, motion } from "framer-motion";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+
 const Embeddings: NextPage = () => {
   const [urls, setUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,9 +49,8 @@ const Embeddings: NextPage = () => {
       <h1 className="w-full my-5 text-2xl font-bold sm:text-4xl ">
         Generate embeddings
       </h1>
-      <p className="mb-4">
-        Paste a list of URLs below to geneate embeddings using the OpenAI API,
-        and add the embeddings to the Supabase embeddings table.
+      <p className="mb-6">
+        Paste a list of URLs below to generate embeddings.
       </p>
       <form onSubmit={handleSubmit}>
         <textarea

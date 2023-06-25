@@ -26,10 +26,11 @@ const handler = async (req: Request): Promise<Response> => {
 
   // console.log(req);
 
-  const { question, keywords, maxChunks } = (await req.json()) as {
+  const { question, keywords, maxChunks, useFakeAnswer } = (await req.json()) as {
     question?: string;
     keywords?: string;
     maxChunks?: number;
+    useFakeAnswer?: boolean;
   };
   console.log(question);
 
@@ -40,7 +41,7 @@ const handler = async (req: Request): Promise<Response> => {
   const query = question;
 
   // OpenAI recommends replacing newlines with spaces for best results
-  const input = query.replace(/\n/g, " ");
+  let input = query.replace(/\n/g, " ");
   // console.log("input: ", input);
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -49,43 +50,46 @@ const handler = async (req: Request): Promise<Response> => {
       ? "https://api.openai.com"
       : process.env.OPENAI_PROXY;
 
-  // const initial = await OpenAIStream({
-  //   model: "gpt-3.5-turbo",
-  //   messages: [
-  //     {
-  //       role: "system",
-  //       content: "You are a helpful assistant."
-  //     },
-  //     {
-  //       role: "user",
-  //       content: `As a world-renowned biologist, write an answer to the following question in 2-3 sentences. Be very specific and use technical terms without any restraint. Just assume everything that is not known.  \n\nQ: ${input}`
-  //     }
-  //   ],
-  //   temperature: 0.5,
-  //   top_p: 1,
-  //   frequency_penalty: 0,
-  //   presence_penalty: 0,
-  //   max_tokens: 1000,
-  //   stream: true,
-  //   n: 1
-  // });
+  if (useFakeAnswer) {
+    const initial = await OpenAIStream({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant."
+        },
+        {
+          role: "user",
+          content: `As a world-renowned biologist, write an answer to the following question in 2-3 sentences. Be very specific and use technical terms without any restraint. Just assume everything that is not known.  \n\nQ: ${ input }`
+        }
+      ],
+      temperature: 0.5,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      max_tokens: 1000,
+      stream: true,
+      n: 1
+    });
 
-  // const reader = initial.getReader();
-  // const decoder = new TextDecoder();
-  // let done = false;
-  // let fakeAnswer = "";
+    const reader = initial.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+    let fakeAnswer = "";
 
-  // while (!done) {
-  //   const { value, done: doneReading } = await reader.read();
-  //   done = doneReading;
-  //   fakeAnswer = fakeAnswer + decoder.decode(value);
-  // }
-  // console.log("fakeAnswer: ", fakeAnswer);
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      done = doneReading;
+      fakeAnswer = fakeAnswer + decoder.decode(value);
+    }
+    console.log("fakeAnswer: ", fakeAnswer);
+    input = fakeAnswer
+  }
 
   const embeddingResponse = await fetch(apiURL + "/v1/embeddings", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${ apiKey }`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -116,7 +120,7 @@ const handler = async (req: Request): Promise<Response> => {
     {
       query_embedding: embedding,
       similarity_threshold: 0.3, // Choose an appropriate threshold for your data
-      match_count: 60, // Choose the number of matches
+      match_count: 100, // Choose the number of matches
       keywords: keywords ? keywords.split(",").map((x) => x.trim()) : undefined
     }
   );
@@ -168,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
       break;
     }
 
-    contextText += `${content.trim()}\nSOURCE: ${doi}\n---\n`;
+    contextText += `${ content.trim() }\nSOURCE: ${ doi }\n---\n`;
   }
 
   console.log(tokenCount);
@@ -177,7 +181,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   const systemContent =
     stripIndent(`"You are a research assistant who values precision and factuality.
-  You will only reply in a straightforward manner. Never say "as an AI language model"; never use hedging language like "but remember that", never tack on "However, note that..." or "Remember that..." or "Please note that...", or "it is important to note that ..." or anything similar at the ends of replies.
+  You will only reply in a straightforward manner in the Markdown format. Never say "as an AI language model"; never use hedging language like "but remember that", never tack on "However, note that..." or "Remember that..." or "Please note that...", or anything similar at the ends of replies.
   Your goal is to answer QUESTION thoroughly and correctly using as much of the CONTEXT as possible.
   Think step-by-step on how CONTEXT can be used to clarify and increase the detail of your answer.
   You must absolutely ensure the reference matches what you say in the answer.
@@ -188,7 +192,7 @@ const handler = async (req: Request): Promise<Response> => {
   The CONTEXT includes DOIs, always include them under a SOURCES heading at the end of your response.
   Always list all DOIs from the CONTEXT, but never list a DOI more than once.
   Never include DOIs that are not in the CONTEXT sections.
-  Use markdown syntax to bold important ideas as needed.`);
+  Use markdown syntax to generate lists as needed.`);
 
   const userContent = stripIndent(`CONTEXT:
   From this reference, hypothalamic tanycytes are radial glial cells that line the ventricular walls of the mediobasal third ventricle. Tanycytes are subdivided into alpha1, alpha2, beta1, and beta2 subtypes based on dorsoventral position and marker gene expression and closely resemble neural progenitors in morphology and gene expression profile. Tanycytes have been reported to generate small numbers of neurons and glia in the postnatal period, although at much lower levels than in more extensively characterized sites of ongoing neurogenesis, such as the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus.
@@ -208,10 +212,10 @@ SOURCES:
 10.1126/sciadv.abg3777`);
 
   const userMessage = stripIndent(`CONTEXT:
-  ${contextText}
+  ${ contextText }
 
   QUESTION:
-  Do not include a summary (i.e. overall...). Answer in a precise and technical manner from CONTEXT, ${query}
+  Do not include a summary (i.e. overall...). Answer in a precise and technical manner from CONTEXT, ${ query }
   `);
 
   const messages = [

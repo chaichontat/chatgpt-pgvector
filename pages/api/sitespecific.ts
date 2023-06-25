@@ -22,7 +22,7 @@ export const cleaners: Record<string, Cleaner> = {
   sciencedirect: {
     goodClass: ".Body",
     toRemove:
-      "h1, h2, h3, h4, figure, [id^=ack], .Appendices, [name^=bbib], .article-textbox",
+      "a, h1, h2, h3, h4, figure, [id^=ack], .Appendices, [name^=bbib], .article-textbox",
     doiTag: "meta[name=citation_doi]",
     runFunc: sciencedirectCleaner
   },
@@ -67,36 +67,45 @@ export const cleaners: Record<string, Cleaner> = {
   jneurosci: {
     goodClass: ".article",
     toRemove:
-      ".kwd-group, h2, h3, a, .materials-methods, .fn-group, .license, .ref-list",
+      "a, .kwd-group, h2, h3, a, .materials-methods, .fn-group, .license, .ref-list",
     doiTag: "meta[name=DC.Identifier]"
   },
   frontiersin: {
     goodClass: ".article-section",
     toRemove:
-      "a, h1, h2, .Imageheaders, .FigureDesc, .References, .authors, .notes, .clear, .AbstractSummary, script, .article-header-container",
+      'a, h1, h2:contains("Acknowledgments") + p, h2:contains("onflict") + p, h2:contains("Funding") + p, h2:contains("ontribution") + p, h2, .Imageheaders, .FigureDesc, .References, .authors, .notes, .clear, .AbstractSummary, script, .article-header-container',
     doiTag: "meta[name=citation_doi]"
   },
   elifesciences: {
     goodClass: ".main-content-grid",
     toRemove:
-      "h2, h3, a, .article-section--highlighted .asset-viewer-inline, [id=data], [id=references], [id^=sa], [id=info], [id=metrics], [id^=fig], .speech-bubble, button, article-meta",
+      "a, h1, h2, h3, h4, .article-section--highlighted .asset-viewer-inline, [id=data], [id=references], [id^=sa], [id=info], [id=metrics], [id^=fig], .speech-bubble, button, article-meta",
     doiTag: "meta[name=dc.identifier]",
     runFunc: elifeCleaner
   },
   cell: {
     goodClass: ".container",
     toRemove:
-      "a, h2, .floatDisplay, .reference-citations, .refs, .article-info, figure, figcaption, style",
+      'a, h2, .floatDisplay, .reference-citations, .refs, .article-info, figure, figcaption, style, .left-side-nav, .figure-viewer',
     doiTag: "meta[name=citation_doi]",
     runFunc: cellCleaner
   }
 } as const;
 
 function sciencedirectCleaner($: cheerio.CheerioAPI) {
+  const toRemove = [
+    "ethods", "References", "Conflict", "contact", "cknowledgments", "Supplementary", "Supplemental", "Experimental", "author", "Declaration", "Related, vailability, contact"
+  ]
   $("section").each((i, elem) => {
     if (
       $(elem).has(
-        'h2:contains("Methods"), h2:contains("References"), h2:contains("Conflict of interest")'
+        toRemove.map((x) => `h2:contains("${x}")`).join(", ")
+      ).length ||
+      $(elem).has(
+        toRemove.map((x) => `h3:contains("${x}")`).join(", ")
+      ).length ||
+      $(elem).has(
+        toRemove.map((x) => `h4:contains("${x}")`).join(", ")
       ).length
     ) {
       $(elem).remove();
@@ -117,6 +126,7 @@ function cellCleaner($: cheerio.CheerioAPI) {
           "Supplementary information",
           "Supplementary data",
           "Supplemental Information",
+          "Graphical Abstract",
           "Experimental Procedures",
           "Author Contributions",
           "Declaration of Interests",
@@ -125,7 +135,7 @@ function cellCleaner($: cheerio.CheerioAPI) {
           "Related Articles"
         ]
           .map(genCell)
-          .join(", ") + " #figures"
+          .join(", ") + ', figures, section > h2:contains("Figure")'
       ).length
     ) {
       $(elem).remove();

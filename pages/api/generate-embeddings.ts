@@ -219,16 +219,19 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .split(" ")
     .map((el) => $(el).text())
     .join(" ")
-    .replace(/\s?\(([;,–\-]\s)*\)/g, "")
-    .replace(/\s?\[[\s,;–\-,]*\]\s?/g, "")
-    .replace("(data not shown)", "")
+    .replace(/Supplementary \)/g, "")
+    .replace(/Extended Data /g, "")
+    .replace(/\(?\s*Fig.*?\)/g, "")
+    .replace(/\s?[\[\(][\s,;–\-,]*[\)\]]\s?/g, "")
+    .replace(" (data not shown)", "")
     .replace(/\s?\(Table.*\)/g, "")
     .replace(/\s?\(ref\.\s\d+\)/, "")
     .replace(/\s+/g, " ")
     .replace(/\.([A-Z])/g, ". $1")
     .replace(/<[^>]*>/gm, "")
-    .replace(/\s\./g, ".")
-    .replace(/\s?\((Supplementary )?[Ff]ig\.? \w+\)/g, "");
+    .replace(/\s+([,.])/g, "$1")
+    .replace(/,+/g, ",")
+    .replace(",.", ".")
 
   const doiFile = doi.replace(/\//g, "_");
   fs.writeFileSync("output/" + doiFile + ".txt", articleText);
