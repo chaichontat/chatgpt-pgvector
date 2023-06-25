@@ -1,5 +1,6 @@
 import { supabaseClient } from "@/lib/embeddings-supabase";
 import * as cheerio from "cheerio";
+import { log } from "console";
 import fs from "fs";
 import { NextApiRequest, NextApiResponse } from "next";
 import puppeteer, { Browser } from "puppeteer";
@@ -86,7 +87,7 @@ async function main(urls: string[]) {
       continue;
     }
 
-    const input = body.replace(/\n/g, " ");
+    const input = body.replaceAll(/\n/g, " ");
 
     console.log("\nDocument length: \n", body.length);
     console.log("\nURL: \n", doi);
@@ -139,7 +140,7 @@ function extractHostname(url: string) {
 
 function normalizeUrl(url: string) {
   // Remove trailing slashes
-  url = url.replace(/\/+$/, "");
+  url = url.replaceAll(/\/+$/g, "");
 
   // Remove section navigators
   const hashIndex = url.indexOf("#");
@@ -219,21 +220,27 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .split(" ")
     .map((el) => $(el).text())
     .join(" ")
-    .replace(/Supplementary \)/g, "")
-    .replace(/Extended Data /g, "")
-    .replace(/\(?\s*Fig.*?\)/g, "")
-    .replace(/\s?[\[\(][\s,;–\-,]*[\)\]]\s?/g, "")
-    .replace(" (data not shown)", "")
-    .replace(/\s?\(Table.*\)/g, "")
-    .replace(/\s?\(ref\.\s\d+\)/, "")
-    .replace(/\s+/g, " ")
-    .replace(/\.([A-Z])/g, ". $1")
-    .replace(/<[^>]*>/gm, "")
-    .replace(/\s+([,.])/g, "$1")
-    .replace(/,+/g, ",")
-    .replace(",.", ".")
+    .replaceAll("Supplementary ", "")
+    .replaceAll(/["“]Methods[”"]/g, "")
+    .replaceAll("Extended", "")
+    .replaceAll(/(Note(s?)|Fig\.|Video(s?)|Data)\s?[\d+\.]*/g, "")
+    .replaceAll("Fig. ", "")
+    .replaceAll(/\(([,;\s]|and)+\)/g, "")
+    .replaceAll(/\s?[\[\(][\s,;–\-,]*[\)\]]\s?/g, "")
+    .replaceAll(" (data not shown)", "")
+    .replaceAll(/\s?\(Table.*\)/g, "")
+    .replaceAll(/\s?\(ref\.\s\d+\)/g, "")
+    .replaceAll(/\s+/g, " ")
+    .replaceAll(/\.([A-Z])/g, ". $1")
+    .replaceAll(/<[^>]*>/gm, "")
+    .replaceAll(/\s+([,.])/g, "$1")
+    .replaceAll(/,+/g, ",")
+    .replaceAll(",.", ".")
+    .replaceAll("\n", " ");
 
-  const doiFile = doi.replace(/\//g, "_");
+  log("articleText: " + articleText)
+
+  const doiFile = doi.replaceAll(/\//g, "_");
   fs.writeFileSync("output/" + doiFile + ".txt", articleText);
 
   // const dois = await supabaseClient.from("unique_doi").select("*")
@@ -260,7 +267,7 @@ function slice(
   chunkSize: number,
   overlap: number = 1
 ) {
-  const sentences = doc.replace(/([.?!])\s*(?=[A-Z])/g, "$1|").split("|");
+  const sentences = doc.replaceAll(/([.?!])\s*(?=[A-Z])/g, "$1|").split("|");
   let idx = 0;
 
   while (idx < sentences.length) {

@@ -16,7 +16,7 @@ export const cleaners: Record<string, Cleaner> = {
   nature: {
     goodClass: ".main-content section[data-title=Abstract]",
     toRemove:
-      'h2, h3, h4, sup, .c-article-section__figure, section[data-title*="Methods"], c-article-box__button-text',
+      'a, h2, h3, h4, sup, .c-article-table, .c-article-section__figure, section[data-title*="Methods"], c-article-box__button-text',
     doiTag: "meta[name=citation_doi]"
   },
   sciencedirect: {
@@ -94,7 +94,7 @@ export const cleaners: Record<string, Cleaner> = {
 
 function sciencedirectCleaner($: cheerio.CheerioAPI) {
   const toRemove = [
-    "ethods", "References", "Conflict", "contact", "cknowledgments", "Supplementary", "Supplemental", "Experimental", "author", "Declaration", "Related, vailability, contact"
+    "ethods", "References", "Conflict", "contact", "cknowledgments", "Supplementary", "Supplemental", "Experimental", "author", "Declaration", "Related", "vailability", "Contributions"
   ]
   $("section").each((i, elem) => {
     if (
