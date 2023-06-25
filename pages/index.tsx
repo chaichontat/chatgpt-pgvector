@@ -11,9 +11,12 @@ const HomePage: NextPage = () => {
           Domain-specific Chat GPT-3 Starter App
         </h1>
         <ul className="mt-10 mb-6 text-xs sm:text-sm text-slate-400">
-          <li><Link href="/embeddings" >Create Embeddings</Link></li>
-          <li><Link href="/docs" >Search</Link></li>
-
+          <li>
+            <Link href="/embeddings">Create Embeddings</Link>
+          </li>
+          <li>
+            <Link href="/docs">Search</Link>
+          </li>
         </ul>
       </div>
     </div>

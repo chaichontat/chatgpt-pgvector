@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import useMeasure from "react-use-measure";
 
 export default function ResizablePanel({
-  children,
+  children
 }: {
   children: React.ReactNode;
 }) {

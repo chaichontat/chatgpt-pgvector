@@ -1,7 +1,7 @@
 import {
   createParser,
   ParsedEvent,
-  ReconnectInterval,
+  ReconnectInterval
 } from "eventsource-parser";
 
 export interface OpenAIStreamPayload {
@@ -14,6 +14,7 @@ export interface OpenAIStreamPayload {
   max_tokens: number;
   stream: boolean;
   n: number;
+  logit_bias: Record<number, number>;
 }
 
 export async function OpenAIStream(payload: OpenAIStreamPayload) {
@@ -22,15 +23,18 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
 
   let counter = 0;
 
-  const apiURL = process.env.OPENAI_PROXY == "" ? "https://api.openai.com" : process.env.OPENAI_PROXY;
+  const apiURL =
+    process.env.OPENAI_PROXY == ""
+      ? "https://api.openai.com"
+      : process.env.OPENAI_PROXY;
 
   const res = await fetch(apiURL + "/v1/chat/completions", {
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`
     },
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(payload)
   });
 
   const stream = new ReadableStream({
@@ -65,7 +69,7 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
       for await (const chunk of res.body as any) {
         parser.feed(decoder.decode(chunk));
       }
-    },
+    }
   });
 
   return stream;

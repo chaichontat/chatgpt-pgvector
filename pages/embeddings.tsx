@@ -1,14 +1,17 @@
 import { NextPage } from "next";
 import { useState } from "react";
-
-
+import ResizablePanel from "@/components/ResizablePanel";
+import { AnimatePresence, motion } from "framer-motion";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 const Embeddings: NextPage = () => {
   const [urls, setUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [answer, setAanswer] = useState<String>("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    setAanswer("");
 
     const response = await fetch("/api/generate-embeddings", {
       method: "POST",
@@ -19,8 +22,25 @@ const Embeddings: NextPage = () => {
     setLoading(false);
 
     if (!response.ok) {
-      // Handle error
+      throw new Error(response.statusText);
     }
+
+    const data = response.body;
+    if (!data) {
+      return;
+    }
+
+    const reader = data.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      done = doneReading;
+      const chunkValue = decoder.decode(value);
+      setAanswer((prev) => prev + chunkValue);
+    }
+    setLoading(false);
   };
 
   return (
@@ -29,7 +49,8 @@ const Embeddings: NextPage = () => {
         Generate embeddings
       </h1>
       <p className="mb-4">
-        Paste a list of URLs below to geneate embeddings using the OpenAI API, and add the embeddings to the Supabase embeddings table.
+        Paste a list of URLs below to geneate embeddings using the OpenAI API,
+        and add the embeddings to the Supabase embeddings table.
       </p>
       <form onSubmit={handleSubmit}>
         <textarea
@@ -47,6 +68,47 @@ const Embeddings: NextPage = () => {
         </button>
       </form>
       {loading && <div>Loading...</div>}
+
+      <ResizablePanel>
+        <AnimatePresence mode="wait">
+          <motion.div className="my-10 space-y-10">
+            {answer && (
+              <>
+                <div>
+                  <h2 className="mx-auto text-3xl font-bold sm:text-4xl">
+                    Here is your answer:{" "}
+                  </h2>
+                </div>
+                {answer.split(/SOURCES?:/).map((splitanswer, index) => {
+                  return (
+                    <div
+                      className={`p-4 transition bg-neutral border border-neutral-focus shadow-md rounded-xl overflow-x-auto max-w-xl ${
+                        index === 0
+                          ? "hover:border-accent-focus cursor-copy text-left"
+                          : ""
+                      }`}
+                      key={index}
+                    >
+                      {index === 0 ? (
+                        <MarkdownRenderer content={splitanswer.trim()} />
+                      ) : (
+                        <></>
+                      )}
+                      <style>
+                        {`
+                              p {
+                                margin-bottom: 20px;
+                              }
+                            `}
+                      </style>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </ResizablePanel>
     </div>
   );
 };

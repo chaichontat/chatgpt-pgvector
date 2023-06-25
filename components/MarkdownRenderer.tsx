@@ -23,7 +23,6 @@ SyntaxHighlighter.registerLanguage("python", python);
 SyntaxHighlighter.registerLanguage("javascript", javascript);
 SyntaxHighlighter.registerLanguage("jsx", jsx);
 
-
 const syntaxTheme = oneDark;
 
 const MarkdownComponents: object = {
@@ -85,7 +84,9 @@ type Props = {
 };
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
-  return <ReactMarkdown components={MarkdownComponents}>{content}</ReactMarkdown>;
+  return (
+    <ReactMarkdown components={MarkdownComponents}>{content}</ReactMarkdown>
+  );
 };
 
 export default MarkdownRenderer;

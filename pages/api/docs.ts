@@ -26,7 +26,11 @@ const handler = async (req: Request): Promise<Response> => {
 
   // console.log(req);
 
-  const { question, keywords } = (await req.json()) as { question?: string, keywords?: string };
+  const { question, keywords, maxChunks } = (await req.json()) as {
+    question?: string;
+    keywords?: string;
+    maxChunks?: number;
+  };
   console.log(question);
 
   if (!question) {
@@ -111,19 +115,22 @@ const handler = async (req: Request): Promise<Response> => {
     keywords ? "match_keywords" : "match_documents",
     {
       query_embedding: embedding,
-      similarity_threshold: 0.1, // Choose an appropriate threshold for your data
+      similarity_threshold: 0.3, // Choose an appropriate threshold for your data
       match_count: 60, // Choose the number of matches
       keywords: keywords ? keywords.split(",").map((x) => x.trim()) : undefined
     }
   );
 
-  console.log("documents:", documents);
   const _dois: string[] = Array.from(
     new Set(documents.map((doc: { doi: string }) => doc.doi))
   );
-  const dois: Record<string, number> = {};
+  const dois: Record<string, number[]> = {};
   for (const [i, doi] of _dois.entries()) {
-    dois[doi] = i;
+    if (!(doi in dois)) {
+      dois[doi] = [i];
+    } else {
+      dois[doi].push(i);
+    }
   }
 
   // if (error) console.error(error);
@@ -139,7 +146,6 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response("No documents found", { status: 404 });
   }
 
-  const individualLimit = 50;
   const counts: Record<string, number> = {};
 
   for (let i = 0; i < documents.length; i++) {
@@ -151,7 +157,7 @@ const handler = async (req: Request): Promise<Response> => {
     } else {
       counts[doi] += 1;
     }
-    if (counts[doi] > individualLimit) {
+    if (counts[doi] > (maxChunks ?? 10)) {
       continue;
     }
     const encoded = tokenizer.encode(content);
@@ -181,7 +187,8 @@ const handler = async (req: Request): Promise<Response> => {
   If you are unsure, you say "Sorry, I don't know."
   The CONTEXT includes DOIs, always include them under a SOURCES heading at the end of your response.
   Always list all DOIs from the CONTEXT, but never list a DOI more than once.
-  Never include DOIs that are not in the CONTEXT sections.`);
+  Never include DOIs that are not in the CONTEXT sections.
+  Use markdown syntax to bold important ideas as needed.`);
 
   const userContent = stripIndent(`CONTEXT:
   From this reference, hypothalamic tanycytes are radial glial cells that line the ventricular walls of the mediobasal third ventricle. Tanycytes are subdivided into alpha1, alpha2, beta1, and beta2 subtypes based on dorsoventral position and marker gene expression and closely resemble neural progenitors in morphology and gene expression profile. Tanycytes have been reported to generate small numbers of neurons and glia in the postnatal period, although at much lower levels than in more extensively characterized sites of ongoing neurogenesis, such as the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus.
@@ -237,7 +244,8 @@ SOURCES:
     presence_penalty: 0,
     max_tokens: 1500,
     stream: true,
-    n: 1
+    n: 1,
+    logit_bias: { 18049: -100, 1593: -100, 3465: -100 } // remove important, note
   };
 
   const stream = await OpenAIStream(payload);
