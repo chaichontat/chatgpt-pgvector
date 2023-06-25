@@ -26,7 +26,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   // console.log(req);
 
-  const { question } = (await req.json()) as { question?: string };
+  const { question, keywords } = (await req.json()) as { question?: string, keywords?: string };
   console.log(question);
 
   if (!question) {
@@ -45,6 +45,39 @@ const handler = async (req: Request): Promise<Response> => {
       ? "https://api.openai.com"
       : process.env.OPENAI_PROXY;
 
+  // const initial = await OpenAIStream({
+  //   model: "gpt-3.5-turbo",
+  //   messages: [
+  //     {
+  //       role: "system",
+  //       content: "You are a helpful assistant."
+  //     },
+  //     {
+  //       role: "user",
+  //       content: `As a world-renowned biologist, write an answer to the following question in 2-3 sentences. Be very specific and use technical terms without any restraint. Just assume everything that is not known.  \n\nQ: ${input}`
+  //     }
+  //   ],
+  //   temperature: 0.5,
+  //   top_p: 1,
+  //   frequency_penalty: 0,
+  //   presence_penalty: 0,
+  //   max_tokens: 1000,
+  //   stream: true,
+  //   n: 1
+  // });
+
+  // const reader = initial.getReader();
+  // const decoder = new TextDecoder();
+  // let done = false;
+  // let fakeAnswer = "";
+
+  // while (!done) {
+  //   const { value, done: doneReading } = await reader.read();
+  //   done = doneReading;
+  //   fakeAnswer = fakeAnswer + decoder.decode(value);
+  // }
+  // console.log("fakeAnswer: ", fakeAnswer);
+
   const embeddingResponse = await fetch(apiURL + "/v1/embeddings", {
     method: "POST",
     headers: {
@@ -52,7 +85,7 @@ const handler = async (req: Request): Promise<Response> => {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      input,
+      input: input,
       model: "text-embedding-ada-002"
     })
   });
@@ -65,12 +98,22 @@ const handler = async (req: Request): Promise<Response> => {
 
   // console.log("embedding: ", embedding);
 
+  // const { data: documents, error } = await supabaseClient.rpc(
+  //   "match_documents",
+  //   {
+  //     query_embedding: embedding,
+  //     similarity_threshold: 0.1, // Choose an appropriate threshold for your data
+  //     match_count: 60 // Choose the number of matches
+  //   }
+  // );
+
   const { data: documents, error } = await supabaseClient.rpc(
-    "match_documents",
+    keywords ? "match_keywords" : "match_documents",
     {
       query_embedding: embedding,
       similarity_threshold: 0.1, // Choose an appropriate threshold for your data
-      match_count: 40 // Choose the number of matches
+      match_count: 60, // Choose the number of matches
+      keywords: keywords ? keywords.split(",").map((x) => x.trim()) : undefined
     }
   );
 
@@ -93,7 +136,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   // Concat matched documents
   if (!documents) {
-    return new Response({ error: "No documents found" }, { status: 404 });
+    return new Response("No documents found", { status: 404 });
   }
 
   const individualLimit = 50;
@@ -115,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
     tokenCount += encoded.text.length;
 
     // Limit context to max 1500 tokens (configurable)
-    if (tokenCount > 8000) {
+    if (tokenCount > 6000) {
       break;
     }
 
@@ -127,13 +170,13 @@ const handler = async (req: Request): Promise<Response> => {
   // console.log("contextText: ", contextText);
 
   const systemContent =
-    stripIndent(`"You are a research assistant who values precision and factuality and ensuring that you provide answers that strictly match with evidence.
+    stripIndent(`"You are a research assistant who values precision and factuality.
   You will only reply in a straightforward manner. Never say "as an AI language model"; never use hedging language like "but remember that", never tack on "However, note that..." or "Remember that..." or "Please note that...", or "it is important to note that ..." or anything similar at the ends of replies.
   Your goal is to answer QUESTION thoroughly and correctly using as much of the CONTEXT as possible.
-  Don't worry about concise answers, you can be very detailed. Include as much information as you can.
   Think step-by-step on how CONTEXT can be used to clarify and increase the detail of your answer.
   You must absolutely ensure the reference matches what you say in the answer.
-  Use precise language and incorporate relevant technical terms or jargon as the reader is an expert scientist and does not appreciate layman's terms or vague/general language.
+  Use precise language and incorporate relevant technical terms or jargon as the reader is an expert scientist.
+  I do not appreciate layman's terms or vague/general language.
   Do not include a summary (i.e. overall...). I want only facts. Be direct.
   If you are unsure, you say "Sorry, I don't know."
   The CONTEXT includes DOIs, always include them under a SOURCES heading at the end of your response.
@@ -157,12 +200,12 @@ A point of interest in the study of tanycytes is their similarity to retinal Mü
 SOURCES:
 10.1126/sciadv.abg3777`);
 
-  const userMessage = `CONTEXT:
+  const userMessage = stripIndent(`CONTEXT:
   ${contextText}
 
-  USER QUESTION:
-  ${query}
-  `;
+  QUESTION:
+  Do not include a summary (i.e. overall...). Answer in a precise and technical manner from CONTEXT, ${query}
+  `);
 
   const messages = [
     {
@@ -188,11 +231,11 @@ SOURCES:
   const payload: OpenAIStreamPayload = {
     model: "gpt-3.5-turbo-16k",
     messages: messages,
-    temperature: 0.3,
+    temperature: 0.5,
     top_p: 1,
     frequency_penalty: 0,
     presence_penalty: 0,
-    max_tokens: 1000,
+    max_tokens: 1500,
     stream: true,
     n: 1
   };

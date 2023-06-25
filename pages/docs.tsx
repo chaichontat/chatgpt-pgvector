@@ -19,6 +19,7 @@ interface Props {
 const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
   const [loading, setLoading] = useState(false);
   const [userQ, setUserQ] = useState("");
+  const [keyword, setKeyword] = useState("");
   const [answer, setAanswer] = useState<String>("");
 
   console.log("Streamed response: ", answer);
@@ -39,7 +40,8 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        question
+        question,
+        keyword
       })
     });
     console.log("Edge function returned.");
@@ -91,6 +93,16 @@ const DocsPage: NextPage<Props> = ({ children, meta: pageMeta }: Props) => {
               rows={4}
               className="w-full p-2 my-5 border rounded-md shadow-md bg-neutral border-neutral-focus "
               placeholder={"e.g. What are edge functions?"}
+            />
+
+            <span class="text-lg">Keyword(s) separated by comma</span>
+
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="w-full p-2 my-5 border rounded-md shadow-md bg-neutral border-neutral-focus "
+              placeholder={"e.g. Pax6"}
             />
 
             {!loading && (

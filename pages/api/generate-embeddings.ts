@@ -4,6 +4,11 @@ import { log } from "console";
 import fs from "fs";
 import { NextApiRequest, NextApiResponse } from "next";
 import puppeteer, { Browser } from "puppeteer";
+import {
+  cellCleaner,
+  elifeCleaner,
+  sciencedirectCleaner
+} from "./sitespecific";
 // embedding doc sizes
 const docSize: number = 100;
 
@@ -18,7 +23,9 @@ export default async function handle(
   const { method, body } = req;
 
   if (method === "POST") {
-    const { urls } = body;
+    let urls: string[] = body.urls.map((url: string) =>
+      url.startsWith("10.") ? "https://doi.org/" + url : url
+    );
     const documents = await getDocuments(urls);
     console.log("sending documents");
     const apiKey = process.env.OPENAI_API_KEY;
@@ -27,6 +34,12 @@ export default async function handle(
       process.env.OPENAI_PROXY == ""
         ? "https://api.openai.com"
         : process.env.OPENAI_PROXY;
+
+
+    // Reset related to DOI.
+    if (documents) {
+      await supabaseClient.from("documents").delete().eq("doi", documents[0].doi);
+    }
 
     for (const { body, doi } of documents) {
       if (body.length < 100) {
@@ -58,6 +71,7 @@ export default async function handle(
           [{ embedding }] = embeddingData.data;
         } catch (error) {
           console.error("error in embeddingData: " + error);
+          await new Promise((r) => setTimeout(r, 30000));
           continue;
         } finally {
           break;
@@ -66,7 +80,7 @@ export default async function handle(
 
       if (embedding) {
         try {
-          await supabaseClient.from("documents").delete().eq("doi", doi);
+
           await supabaseClient.from("documents").insert({
             content: input,
             embedding,
@@ -88,15 +102,16 @@ function extractHostname(url: string) {
 }
 
 const goodClass = {
-  nature: ".main-content",
+  nature: "section[data-title=Abstract] .main-content",
   sciencedirect: ".Body",
   nih: ".sec",
   science: "#abstracts #bodymatter",
   pnas: "#abstracts #bodymatter",
   biomedcentral: "article",
   jneurosci: ".article",
-  frontiersin: ".article-section"
-  // elifesciences: ".main-content-grid"
+  frontiersin: ".article-section",
+  elifesciences: ".main-content-grid",
+  cell: ".container"
 };
 
 type PageCleaner = Record<keyof typeof goodClass, string>;
@@ -107,8 +122,10 @@ function genAvoidSelection(names: string[], tag: string) {
 
 const toRemove: PageCleaner = {
   nih: "[id^=fn], [id^=ref], .fig, a",
-  nature: 'h2, sup, .c-article-section__figure, [data-title="Methods"]',
-  sciencedirect: "figure, [id^=ack], .Appendices, [name^=bbib]",
+  nature:
+    'h2, h3, h4, sup, .c-article-section__figure, section[data-title="Methods"]',
+  sciencedirect:
+    "figure, [id^=ack], .Appendices, [name^=bbib], .article-textbox",
   science: '.figure-wrap, section[role="doc-acknowledgments"], a',
   pnas: ".figure-wrap, a",
   biomedcentral:
@@ -132,8 +149,11 @@ const toRemove: PageCleaner = {
     ),
   jneurosci:
     ".kwd-group, h2, h3, a, .materials-methods, .fn-group, .license, .ref-list",
-  frontiersin: "a, h2, .Imageheaders, .FigureDesc, .References"
-  // elifesciences: "h2, h3, a, .article-section--highlighted .asset-viewer-inline"
+  frontiersin:
+    "a, h1, h2, .Imageheaders, .FigureDesc, .References, .authors, .notes, .clear, .AbstractSummary, script, .article-header-container",
+  elifesciences:
+    "h2, h3, a, .article-section--highlighted .asset-viewer-inline, [id=data], [id=references], [id^=sa], [id=info], [id=metrics], [id^=fig], .speech-bubble, button",
+  cell: "a, h2, .floatDisplay, .reference-citations, .refs, .article-info"
 };
 
 const doiTag: PageCleaner = {
@@ -144,7 +164,15 @@ const doiTag: PageCleaner = {
   pnas: "meta[name=dc.Identifier][scheme=doi]",
   biomedcentral: "meta[name=citation_doi]",
   jneurosci: "meta[name=DC.Identifier]",
-  frontiersin: "meta[name=citation_doi]"
+  frontiersin: "meta[name=citation_doi]",
+  elifesciences: "meta[name=dc.identifier]",
+  cell: "meta[name=citation_doi]"
+};
+
+const runFunc: Record<string, ($: cheerio.CheerioAPI) => void> = {
+  sciencedirect: sciencedirectCleaner,
+  elifesciences: elifeCleaner,
+  cell: cellCleaner
 };
 
 function normalizeUrl(url: string) {
@@ -179,12 +207,23 @@ async function getDocuments(urls: string[]) {
         await run(documents, browser, url);
         break;
       } catch (error) {
+        if (error.message === "hostname not in goodClass") {
+          break;
+        }
         console.error("error in getDocuments: " + error);
         attempt++;
       }
     }
   }
+  console.log(documents.length)
   return documents;
+}
+
+async function getMetadata(doi: string) {
+  const resp = await fetch(
+    `https://api.openalex.org/works/https://doi.org/${doi}`
+  );
+  return await resp.json();
 }
 
 async function run(documents: Docs, browser: Browser, url: string) {
@@ -211,41 +250,62 @@ async function run(documents: Docs, browser: Browser, url: string) {
     throw new Error("No DOI found");
   }
 
+  if (runFunc[hostname]) runFunc[hostname]($);
   if (toRemove[hostname]) $(toRemove[hostname]).remove();
 
   const articleText = goodClass[hostname]
     .split(" ")
     .map((el) => $(el).text())
     .join(" ")
-    .replace(/\.(A-Z)/g, ". $1")
-    .replace(/ \(([;,]\s)*\)/g, "")
-    .replace(/\[(,\s?)*\]\s?/g, "")
-    .replace(/\s[\.,]\s/g, ". ")
+    .replace(/\s?\(([;,–\-]\s)*\)/g, "")
+    .replace(/\s?\[[\s,;–\-,]*\]\s?/g, "")
+    .replace(/\s?\((Supplementary )?Fig\.? \w+\)/g, "")
+    .replace("(data not shown)", "")
+    .replace(/\s?\(Table.*\)/g, "")
+    .replace(/\s?\(ref\.\s\d+\)/, "")
     .replace(/\s+/g, " ")
-    .replace(/\[[\s,;–-]*\]/g, "")
-    .replace(/\([\s,;–-]*\)/g, "")
-    .replace(/\(Fig. \w+\)/g, "");
+    .replace(/\.([A-Z])/g, ". $1")
+    .replace(/<[^>]*>/gm, "");
 
   const doiFile = doi.replace(/\//g, "_");
-  fs.writeFileSync("output/" + doiFile + ".html", html);
   fs.writeFileSync("output/" + doiFile + ".txt", articleText);
+  const metadata = await getMetadata(doi);
 
-  slice(documents, doi, articleText, 100);
+  return slice(documents, doi, metadata.title, articleText, 150);
 }
 
+function countWords(str: string) {
+  return str.split(" ").length;
+}
+
+// Slice the document by sentence into chunks of approximately 200 words
 function slice(
   documents: { doi: string; body: string }[],
   doi: string,
+  title: string,
   doc: string,
-  docSize: number,
-  overlap: number = 20
+  chunkSize: number,
+  overlap: number = 1
 ) {
-  let start = 0;
-  const words = doc.split(" ");
-  while (start < words.length) {
-    const end = start + docSize;
-    const chunk = words.slice(start, end).join(" ");
-    documents.push({ doi, body: chunk });
-    start = end - overlap;
+  const sentences = doc.replace(/([.?!])\s*(?=[A-Z])/g, "$1|").split("|")
+  let idx = 0;
+
+  while (idx < sentences.length) {
+    let chunk = ""
+    let wordCount = 0
+    while (wordCount < chunkSize) {
+      if (idx >= sentences.length) break;
+      const sentence = sentences[idx].trim()
+      wordCount += countWords(sentence)
+      chunk += " " + sentence
+      idx++
+    }
+
+    console.log("chunk", chunk);
+    documents.push({ doi, body: `${ title }. ${ chunk }` });
+    if (idx < sentences.length - overlap) {
+      idx -= overlap;
+    }
   }
+  return documents
 }

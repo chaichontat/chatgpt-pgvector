@@ -37,3 +37,6 @@ yarn-error.log*
 
 # editors
 .vscode
+
+*.txt
+*.html
