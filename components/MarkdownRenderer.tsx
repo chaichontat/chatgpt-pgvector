@@ -10,6 +10,7 @@ import python from "react-syntax-highlighter/dist/cjs/languages/prism/python";
 import javascript from "react-syntax-highlighter/dist/cjs/languages/prism/javascript";
 import jsx from "react-syntax-highlighter/dist/cjs/languages/prism/jsx";
 import rangeParser from "parse-numeric-range";
+import remarkGfm from "remark-gfm";
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { ReactNode } from "react";
 
@@ -85,7 +86,7 @@ type Props = {
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   return (
-    <ReactMarkdown components={MarkdownComponents}>{content}</ReactMarkdown>
+    <ReactMarkdown className="prose" components={MarkdownComponents} remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
   );
 };
 

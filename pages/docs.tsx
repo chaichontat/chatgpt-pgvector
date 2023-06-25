@@ -194,7 +194,8 @@ const DocsPage: NextPage<Props> = () => {
                               {`
                               p {
                                 margin-bottom: 20px;
-                              }
+                              };
+
                             `}
                             </style>
                           </div>

@@ -23,6 +23,7 @@ async function getMetadata(doi: string) {
     journal: string;
   };
   if (!data) {
+    console.error("No data for doi", doi)
     return doi;
   }
   const out = `${data.first_author} et al. (${data.year}). ${data.title}. <i>${data.journal}</i>.`;

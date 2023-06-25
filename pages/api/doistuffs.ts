@@ -140,10 +140,10 @@ export async function uploadMetadata(
   let { error } = await supabaseClient.from("citation").insert({
     doi,
     title: metadata.title,
-    first_author: metadata.authorships[0].author.display_name.split(" ").at(-1),
-    last_author: metadata.authorships.at(-1)?.author.display_name.split(" ").at(-1),
+    first_author: metadata.authorships[0].author?.display_name.split(" ").at(-1),
+    last_author: metadata.authorships.at(-1)?.author?.display_name.split(" ").at(-1),
     year: metadata.publication_year,
-    journal: metadata.primary_location.source.display_name
+    journal: metadata.primary_location?.source?.display_name
   });
 
   if (error) {

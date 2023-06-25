@@ -114,7 +114,7 @@ const handler = async (req: Request): Promise<Response> => {
   //     match_count: 60 // Choose the number of matches
   //   }
   // );
-
+  console.log("keywords: ", keywords)
   const { data: documents, error } = await supabaseClient.rpc(
     keywords ? "match_keywords" : "match_documents",
     {
@@ -143,7 +143,7 @@ const handler = async (req: Request): Promise<Response> => {
   let tokenCount = 0;
   let contextText = "";
 
-  // console.log("documents: ", documents);
+  console.log("documents: ", documents);
 
   // Concat matched documents
   if (!documents) {
@@ -181,7 +181,7 @@ const handler = async (req: Request): Promise<Response> => {
 
   const systemContent =
     stripIndent(`"You are a research assistant who values precision and factuality.
-  You will only reply in a straightforward manner in the Markdown format. Never say "as an AI language model"; never use hedging language like "but remember that", never tack on "However, note that..." or "Remember that..." or "Please note that...", or anything similar at the ends of replies.
+  You will only reply in a straightforward manner in bullet points. Never say "as an AI language model"; never use hedging language like "but remember that", never tack on "However, note that..." or "Remember that..." or "Please note that...", or anything similar at the ends of replies.
   Your goal is to answer QUESTION thoroughly and correctly using as much of the CONTEXT as possible.
   Think step-by-step on how CONTEXT can be used to clarify and increase the detail of your answer.
   You must absolutely ensure the reference matches what you say in the answer.
@@ -191,8 +191,7 @@ const handler = async (req: Request): Promise<Response> => {
   If you are unsure, you say "Sorry, I don't know."
   The CONTEXT includes DOIs, always include them under a SOURCES heading at the end of your response.
   Always list all DOIs from the CONTEXT, but never list a DOI more than once.
-  Never include DOIs that are not in the CONTEXT sections.
-  Use markdown syntax to generate lists as needed.`);
+  Never include DOIs that are not in the CONTEXT sections.`);
 
   const userContent = stripIndent(`CONTEXT:
   From this reference, hypothalamic tanycytes are radial glial cells that line the ventricular walls of the mediobasal third ventricle. Tanycytes are subdivided into alpha1, alpha2, beta1, and beta2 subtypes based on dorsoventral position and marker gene expression and closely resemble neural progenitors in morphology and gene expression profile. Tanycytes have been reported to generate small numbers of neurons and glia in the postnatal period, although at much lower levels than in more extensively characterized sites of ongoing neurogenesis, such as the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus.
@@ -221,19 +220,19 @@ SOURCES:
   const messages = [
     {
       role: "system",
-      content: systemContent
+      content: systemContent.replace("\n", " ")
     },
     {
       role: "user",
-      content: userContent
+      content: userContent.replace("\n", " ")
     },
     {
       role: "assistant",
-      content: assistantContent
+      content: assistantContent.replace("\n", " ")
     },
     {
       role: "user",
-      content: userMessage
+      content: userMessage.replace("\n", " ")
     }
   ];
 
@@ -249,7 +248,7 @@ SOURCES:
     max_tokens: 1500,
     stream: true,
     n: 1,
-    logit_bias: { 18049: -100, 1593: -100, 3465: -100 } // remove important, note
+    logit_bias: { 18049: -100, 1593: -100, 3465: -100, 7247: -100, 2102: -100, 11: -2 } // remove important, note, understood, however
   };
 
   const stream = await OpenAIStream(payload);

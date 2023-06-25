@@ -20,8 +20,6 @@ const Embeddings: NextPage = () => {
       body: JSON.stringify({ urls })
     });
 
-    setLoading(false);
-
     if (!response.ok) {
       throw new Error(response.statusText);
     }
@@ -74,11 +72,6 @@ const Embeddings: NextPage = () => {
           <motion.div className="my-10 space-y-10">
             {answer && (
               <>
-                <div>
-                  <h2 className="mx-auto text-3xl font-bold sm:text-4xl">
-                    Here is your answer:{" "}
-                  </h2>
-                </div>
                 {answer.split(/SOURCES?:/).map((splitanswer, index) => {
                   return (
                     <div

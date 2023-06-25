@@ -4,7 +4,7 @@ import { log } from "console";
 import fs from "fs";
 import { NextApiRequest, NextApiResponse } from "next";
 import puppeteer, { Browser } from "puppeteer";
-import { Stream } from "stream";
+import { Readable, ReadableOptions, Stream } from "stream";
 import { uploadMetadata } from "./doistuffs";
 import { cleaners } from "./sitespecific";
 // embedding doc sizes
@@ -12,6 +12,28 @@ import { cleaners } from "./sitespecific";
 let browserPromise = puppeteer.launch({ headless: "new" });
 
 type Docs = { doi: string; body: string }[];
+
+class CustomReadableStream extends Readable {
+  private counter: number;
+
+  constructor( options: ReadableOptions = {}) {
+    super(options);
+    this.counter = 0;
+  }
+
+  _read() {
+    // Do nothing here
+  }
+
+  log(...messages: string[]) {
+    this.counter++;
+    this.push(messages.join(' '));
+  }
+}
+
+let stream: CustomReadableStream;
+
+
 
 export default async function handle(
   req: NextApiRequest,
@@ -24,26 +46,26 @@ export default async function handle(
       url.startsWith("10.") ? "https://doi.org/" + url : url
     );
 
-    const readableStream = new Stream.Readable();
-    readableStream.push("Hello, ");
-    readableStream.pause();
+    stream = new CustomReadableStream()
+    // readableStream.push("Hello, ");
+    // readableStream.pause();
 
-    const promises = [];
-    promises.push(main(urls));
+    // const promises = [];
+    main(stream, urls).then(() => stream.push(null));
 
-    // const readStream = new ReadableStream({
-    //   start(controller) {
-    // Append some data to the stream
-    // set new text every 100ms for 3 seconds
-    for (let i = 0; i < 10; i++) {
-      promises.push(
-        setTimeout(() => {
-          readableStream.push("Hello, ");
-          readableStream.push("world!");
-        }, i * 100)
-      );
-    }
-    Promise.all(promises).then(() => readableStream.push(null));
+    // // const readStream = new ReadableStream({
+    // //   start(controller) {
+    // // Append some data to the stream
+    // // set new text every 100ms for 3 seconds
+    // for (let i = 0; i < 10; i++) {
+    //   promises.push(
+    //     setTimeout(() => {
+    //       readableStream.push("Hello, ");
+    //       readableStream.push("world!");
+    //     }, i * 100)
+    //   );
+    // }
+    // Promise.all(promises).then(() => readableStream.push(null));
 
     //     // Close the stream after all promises are resolved
     //     Promise.all(promises).then(() => controller.close());
@@ -59,14 +81,13 @@ export default async function handle(
 
     res.setHeader("Content-Type", "text/plain");
     res.setHeader("Cache-Control", "no-cache");
-
-    readableStream.pipe(res);
+    stream.pipe(res);
 
     // return res.status(200).json({ success: true });
   }
 }
 
-async function main(urls: string[]) {
+async function main(stream: CustomReadableStream, urls: string[]) {
   const documents = await getDocuments(urls);
   console.log("sending documents");
   const apiKey = process.env.OPENAI_API_KEY;
@@ -81,11 +102,14 @@ async function main(urls: string[]) {
     await supabaseClient.from("documents").delete().eq("doi", documents[0].doi);
   }
 
+  stream.log("Working")
+
   for (const { body, doi } of documents) {
     if (body.length < 100) {
-      console.log("skipping document with length < 100");
+      stream.log("skipping document with length < 100");
       continue;
     }
+    stream.log(".")
 
     const input = body.replaceAll(/\n/g, " ");
 
@@ -110,6 +134,7 @@ async function main(urls: string[]) {
       try {
         [{ embedding }] = embeddingData.data;
       } catch (error) {
+        stream.log("error in embeddingData: " + error);
         console.error("error in embeddingData: " + error);
         await new Promise((r) => setTimeout(r, 30000));
         continue;
@@ -126,10 +151,12 @@ async function main(urls: string[]) {
           doi
         });
       } catch (error) {
+        stream.log("error in supabase insert: " + error);
         console.error("error in supabase insert: " + error);
       }
     }
   }
+  stream.log("\nDone");
 }
 
 function extractHostname(url: string) {
@@ -167,12 +194,15 @@ async function getDocuments(urls: string[]) {
     let attempt = 0;
     while (attempt < 3) {
       try {
+        stream.log("Running", url, "\n")
         await run(documents, browser, url);
         break;
       } catch (error) {
         if (error.message === "hostname not in goodClass") {
+          stream.log("Unknown web", url, "\n")
           break;
         }
+        stream.log("error in getDocuments: " + error)
         console.error("error in getDocuments: " + error);
         attempt++;
       }
@@ -221,6 +251,7 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .map((el) => $(el).text())
     .join(" ")
     .replaceAll("Supplementary ", "")
+    .replaceAll("(refs)", "")
     .replaceAll(/["“]Methods[”"]/g, "")
     .replaceAll("Extended", "")
     .replaceAll(/(Note(s?)|Fig\.|Video(s?)|Data)\s?[\d+\.]*/g, "")
@@ -273,8 +304,7 @@ function slice(
   while (idx < sentences.length) {
     let chunk = "";
     let wordCount = 0;
-    while (wordCount < chunkSize) {
-      if (idx >= sentences.length) break;
+    while (wordCount < chunkSize && idx < sentences.length) {
       const sentence = sentences[idx].trim();
       wordCount += countWords(sentence);
       chunk += " " + sentence;

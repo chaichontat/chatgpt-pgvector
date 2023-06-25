@@ -9,31 +9,31 @@ type Cleaner = {
 };
 
 function genAvoidSelection(names: string[], tag: string) {
-  return names.map((name) => `section[${tag}="${name}"]`).join(", ");
+  return names.map((name) => `section[${ tag }="${ name }"]`).join(", ");
 }
 
 export const cleaners: Record<string, Cleaner> = {
   nature: {
     goodClass: ".main-content section[data-title=Abstract]",
     toRemove:
-      'a, h2, h3, h4, sup, .c-article-table, .c-article-section__figure, section[data-title*="Methods"], c-article-box__button-text',
+      'a:not([href*="Glos"]), h2, h3, h4, sup, .c-article-table, .c-article-section__figure, section[data-title*="ethods"], .c-article-box__button-text, .c-article-box',
     doiTag: "meta[name=citation_doi]"
   },
   sciencedirect: {
     goodClass: ".Body",
     toRemove:
-      "a, h1, h2, h3, h4, figure, [id^=ack], .Appendices, [name^=bbib], .article-textbox",
+      'a:not([href*="topic"]), h1, h2, h3, h4, figure, [id^=ack], .Appendices, [name^=bbib], .article-textbox, .tables, [class*="navigation"], .list',
     doiTag: "meta[name=citation_doi]",
     runFunc: sciencedirectCleaner
   },
   nih: {
     goodClass: ".sec",
-    toRemove: "[id^=fn], [id^=ref], .fig, a",
+    toRemove: "[id^=fn], [id^=ref], [id^=ack], .fig, a",
     doiTag: "meta[name=citation_doi]"
   },
   science: {
     goodClass: "#abstracts #bodymatter",
-    toRemove: '.figure-wrap, section[role="doc-acknowledgments"], a',
+    toRemove: '.figure-wrap, section[role="doc-acknowledgments"], a, section[data-type*="ethod"]',
     doiTag: "meta[name=dc.Identifier][scheme=doi]"
   },
   pnas: {
@@ -51,6 +51,7 @@ export const cleaners: Record<string, Cleaner> = {
           "Materials and methods",
           "Availability of data and materials",
           "Acknowledgements",
+          "Acknowledgments",
           "Funding",
           "Author information",
           "Ethics declarations",
@@ -67,13 +68,13 @@ export const cleaners: Record<string, Cleaner> = {
   jneurosci: {
     goodClass: ".article",
     toRemove:
-      "a, .kwd-group, h2, h3, a, .materials-methods, .fn-group, .license, .ref-list",
-    doiTag: "meta[name=DC.Identifier]"
+      'a, div.section:has(h2:contains("Materials and Methods")), .kwd-group, h2, h3, a, .materials-methods, .fn-group, .license, .ref-list',
+    doiTag: "meta[name=DC.Identifier]",
   },
   frontiersin: {
     goodClass: ".article-section",
     toRemove:
-      'a, h1, h2:contains("Acknowledgments") + p, h2:contains("onflict") + p, h2:contains("Funding") + p, h2:contains("ontribution") + p, h2, .Imageheaders, .FigureDesc, .References, .authors, .notes, .clear, .AbstractSummary, script, .article-header-container',
+      'a, h1, h2:contains("Acknowledg") + p, h2:contains("onflict") + p, h2:contains("Funding") + p, h2:contains("ontribution") + p, h2:contains("Publisher") + p, h2, .Imageheaders, .FigureDesc, .References, .authors, .notes, .clear, .AbstractSummary, script, .article-header-container',
     doiTag: "meta[name=citation_doi]"
   },
   elifesciences: {
@@ -94,18 +95,18 @@ export const cleaners: Record<string, Cleaner> = {
 
 function sciencedirectCleaner($: cheerio.CheerioAPI) {
   const toRemove = [
-    "ethods", "References", "Conflict", "contact", "cknowledgments", "Supplementary", "Supplemental", "Experimental", "author", "Declaration", "Related", "vailability", "Contributions"
+    "ethods", "References", "Conflict", "contact", "cknowledg", "Supplementary", "Supplemental", "Experimental", "author", "Declaration", "Related", "vailability", "Contributions"
   ]
   $("section").each((i, elem) => {
     if (
       $(elem).has(
-        toRemove.map((x) => `h2:contains("${x}")`).join(", ")
+        toRemove.map((x) => `h2:contains("${ x }")`).join(", ")
       ).length ||
       $(elem).has(
-        toRemove.map((x) => `h3:contains("${x}")`).join(", ")
+        toRemove.map((x) => `h3:contains("${ x }")`).join(", ")
       ).length ||
       $(elem).has(
-        toRemove.map((x) => `h4:contains("${x}")`).join(", ")
+        toRemove.map((x) => `h4:contains("${ x }")`).join(", ")
       ).length
     ) {
       $(elem).remove();
@@ -114,7 +115,7 @@ function sciencedirectCleaner($: cheerio.CheerioAPI) {
 }
 
 function genCell(name: string) {
-  return `h2[data-left-hand-nav="${name}"]`;
+  return `h2[data-left-hand-nav="${ name }"]`;
 }
 
 function cellCleaner($: cheerio.CheerioAPI) {
@@ -123,6 +124,7 @@ function cellCleaner($: cheerio.CheerioAPI) {
       $(elem).has(
         [
           "Acknowledgments",
+          "Acknowledgements",
           "Supplementary information",
           "Supplementary data",
           "Supplemental Information",
@@ -132,7 +134,8 @@ function cellCleaner($: cheerio.CheerioAPI) {
           "Declaration of Interests",
           "Figures",
           "Article info",
-          "Related Articles"
+          "Related Articles",
+          "Accession Numbers"
         ]
           .map(genCell)
           .join(", ") + ', figures, section > h2:contains("Figure")'
@@ -144,7 +147,7 @@ function cellCleaner($: cheerio.CheerioAPI) {
 }
 
 function _genElife($: cheerio.CheerioAPI, elem: cheerio.Element, name: string) {
-  if ($(elem).has("header").has("a").has(`h2:contains("${name}")`).length) {
+  if ($(elem).has("header").has("a").has(`h2:contains("${ name }")`).length) {
     log("removing " + name);
     $(elem).remove();
     return true;
