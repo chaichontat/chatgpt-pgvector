@@ -41,7 +41,7 @@ export const cleaners: Record<string, Cleaner> = {
     doiTag: "meta[name=citation_doi]"
   },
   sciencedirect: {
-    goodClass: ".Body",
+    goodClass: ".abstract.author .Body",
     toRemove:
       'a:not([href*="topic"]), h1, h2, h3, h4, figure, [id^=ack], .Appendices, [name^=bbib], .article-textbox, .tables, [class*="navigation"], .list, .display',
     doiTag: "meta[name=citation_doi]",
@@ -166,7 +166,7 @@ export const cleaners: Record<string, Cleaner> = {
   annualreviews: {
     goodClass: ".article-content",
     toRemove:
-      "[class*=word], .figure-container, script, [class*=equation], sup, .formulaLabel, .ack, .lit-cited, a, h1, h2, h3, h4",
+      '[class*=word], .article-tools, .figure-container, script, [class*=equation], sup, .formulaLabel, .ack, .lit-cited, .ar-modal .mfp-hide, a, h1, h2, h3, h4, p:contains("received funding"), p:contains("affiliation")',
     doiTag: "meta[name=dc.Identifier]"
   }
 } as const;

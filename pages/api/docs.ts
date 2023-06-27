@@ -263,7 +263,43 @@ SOURCES:
   };
 
   const stream = await OpenAIStream(payload);
-  return new Response(stream);
+  return appendToStreamAndRespond(
+    stream,
+    "\nSOURCE: " + contextText.replaceAll("SOURCE:", "")
+  );
 };
+
+function appendToStreamAndRespond(
+  inputStream: ReadableStream<any>,
+  appendString: string
+) {
+  // Create a TransformStream that appends the string
+  const transformStream = new TransformStream({
+    transform(chunk, controller) {
+      // Pass through the original chunk without modification
+      controller.enqueue(chunk);
+    },
+    flush(controller) {
+      // Append the string once the input stream is done
+      const encoder = new TextEncoder();
+      const appendStringBuffer = encoder.encode(appendString);
+      controller.enqueue(appendStringBuffer);
+      controller.terminate();
+    }
+  });
+
+  // Pipe the input stream through the TransformStream
+  const outputStream = inputStream.pipeThrough(transformStream);
+
+  // Pass the resulting stream to the Response object
+  return new Response(outputStream);
+
+  // Set the content type and status code if necessary
+  // response.headers.set('Content-Type', 'text/plain');
+  // response.status = 200;
+
+  // // Don't forget to close the response
+  // response.close();
+}
 
 export default handler;

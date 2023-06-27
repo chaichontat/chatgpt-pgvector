@@ -78,15 +78,15 @@ const DocsPage: NextPage<Props> = () => {
   return (
     <>
       <MetaTags
-        title="Science Answerbot"
+        title="Exocortex"
         description="Science answer-bot."
         cardImage="/bot/docs-og.png"
         url=""
       />
       <div className="flex flex-col items-center justify-center min-h-screen py-2 mx-auto">
         <main className="flex flex-col items-center justify-center flex-1 w-full min-h-screen px-4 py-2 mx-auto mt-12 text-center sm:mt-20">
-          <h1 className="max-w-2xl text-2xl font-bold sm:text-4xl">
-            Ask me anything<sup>*</sup> about science!
+          <h1 className="max-w-3xl text-4xl font-bold mb-2">
+            Ask your exocortex anything<sup>*</sup> about science!
           </h1>
           <div className="w-full max-w-2xl flex flex-col items-center">
             <div className="max-w-xl">
@@ -189,19 +189,24 @@ const DocsPage: NextPage<Props> = () => {
                               <>
                                 <p className="mb-4">SOURCES</p>
                                 <ul className="text-left text-sm -indent-4 ml-6 my-2">
-                                  {splitanswer
-                                    .trim()
-                                    .split("\n")
-                                    .filter((url) => url.trim().length > 0)
-                                    .map((url) =>
-                                      url.includes("/") ? (
-                                        <li key={uuidv4()}>
-                                          <Link doi={url} />
-                                        </li>
-                                      ) : (
-                                        <li key={uuidv4()}>{url}</li>
-                                      )
-                                    )}
+                                  {loading
+                                    ? splitanswer
+                                    : splitanswer
+                                        .trim()
+                                        .split("\n")
+                                        .filter((url) => url.trim().length > 0)
+                                        .map((url) => {
+                                          const doi = url.match(
+                                            /(10.\d{4,9}\/[-._;()\/:a-zA-Z0-9]+)/
+                                          )?.[1];
+                                          return doi ? (
+                                            <li key={uuidv4()}>
+                                              <Link doi={doi} />
+                                            </li>
+                                          ) : (
+                                            <li key={uuidv4()}>{url}</li>
+                                          );
+                                        })}
                                 </ul>
                               </>
                             )}

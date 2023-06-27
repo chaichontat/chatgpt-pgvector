@@ -50,7 +50,9 @@ export default async function handle(
     // readableStream.pause();
 
     // const promises = [];
-    main(stream, urls).then(() => stream.push(null));
+    main(stream, urls)
+      .then(() => stream.push(null))
+      .catch(() => stream.push(null));
 
     // // const readStream = new ReadableStream({
     // //   start(controller) {
