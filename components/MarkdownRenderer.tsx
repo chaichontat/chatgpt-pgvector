@@ -86,7 +86,13 @@ type Props = {
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   return (
-    <ReactMarkdown className="prose" components={MarkdownComponents} remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    <ReactMarkdown
+      className="prose"
+      components={MarkdownComponents}
+      remarkPlugins={[remarkGfm]}
+    >
+      {content}
+    </ReactMarkdown>
   );
 };
 

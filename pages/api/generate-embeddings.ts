@@ -1,5 +1,6 @@
 import { supabaseClient } from "@/lib/embeddings-supabase";
 import * as cheerio from "cheerio";
+import { last } from "cheerio/lib/api/traversing";
 import { log } from "console";
 import fs from "fs";
 import { NextApiRequest, NextApiResponse } from "next";
@@ -16,7 +17,7 @@ type Docs = { doi: string; body: string }[];
 class CustomReadableStream extends Readable {
   private counter: number;
 
-  constructor( options: ReadableOptions = {}) {
+  constructor(options: ReadableOptions = {}) {
     super(options);
     this.counter = 0;
   }
@@ -27,13 +28,11 @@ class CustomReadableStream extends Readable {
 
   log(...messages: string[]) {
     this.counter++;
-    this.push(messages.join(' '));
+    this.push(messages.join(" "));
   }
 }
 
 let stream: CustomReadableStream;
-
-
 
 export default async function handle(
   req: NextApiRequest,
@@ -46,7 +45,7 @@ export default async function handle(
       url.startsWith("10.") ? "https://doi.org/" + url : url
     );
 
-    stream = new CustomReadableStream()
+    stream = new CustomReadableStream();
     // readableStream.push("Hello, ");
     // readableStream.pause();
 
@@ -102,14 +101,14 @@ async function main(stream: CustomReadableStream, urls: string[]) {
     await supabaseClient.from("documents").delete().eq("doi", documents[0].doi);
   }
 
-  stream.log("Working")
+  stream.log("Working");
 
   for (const { body, doi } of documents) {
     if (body.length < 100) {
       stream.log("skipping document with length < 100");
       continue;
     }
-    stream.log(".")
+    stream.log(".");
 
     const input = body.replaceAll(/\n/g, " ");
 
@@ -194,15 +193,15 @@ async function getDocuments(urls: string[]) {
     let attempt = 0;
     while (attempt < 3) {
       try {
-        stream.log("Running", url, "\n")
         await run(documents, browser, url);
         break;
       } catch (error) {
+        // @ts-ignore
         if (error.message === "hostname not in goodClass") {
-          stream.log("Unknown web", url, "\n")
+          stream.log("Unknown web", url, "\n");
           break;
         }
-        stream.log("error in getDocuments: " + error)
+        stream.log("error in getDocuments: " + error);
         console.error("error in getDocuments: " + error);
         attempt++;
       }
@@ -212,9 +211,26 @@ async function getDocuments(urls: string[]) {
   return documents;
 }
 
+function convertCell(url: string) {
+  const match = url.match(
+    /^https:\/\/www\.cell\.com\/[a-z]+\/fulltext\/(S.+)$/i
+  );
+  if (match) {
+    return `https://www.sciencedirect.com/science/article/pii/${match[1].replace(
+      /\W+/g,
+      ""
+    )}`;
+  }
+  throw new Error("This is not a valid Cell Press URL.");
+}
+
 async function run(documents: Docs, browser: Browser, url: string) {
-  let fetchURL = url;
+  if (extractHostname(url) === "cell") {
+    url = convertCell(url);
+  }
+  let fetchURL = url.replace("/abs/", "/full/").replaceAll(".short", ".full");
   console.log("fetching url: " + fetchURL);
+  stream.log("Running", fetchURL, "\n");
 
   const page = await browser.newPage();
   await page.goto(fetchURL, { waitUntil: "networkidle0" });
@@ -250,16 +266,24 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .split(" ")
     .map((el) => $(el).text())
     .join(" ")
+    .replaceAll("e.g.", "such as")
     .replaceAll("Supplementary ", "")
+    .replaceAll(/ref\.\s?/g, "")
+    .replaceAll("Figure ", "")
+    .replaceAll("for review see ", "")
+    .replaceAll("review in", "")
+    .replaceAll(/ Additional file :?\s?\w+(and )?/g, "")
     .replaceAll("(refs)", "")
     .replaceAll(/["“]Methods[”"]/g, "")
     .replaceAll("Extended", "")
     .replaceAll(/(Note(s?)|Fig\.|Video(s?)|Data)\s?[\d+\.]*/g, "")
     .replaceAll("Fig. ", "")
+    .replaceAll(" ;", "")
+    .replaceAll(/\([A-Z](,\s[A-Z])*\)/g, "")
     .replaceAll(/\(([,;\s]|and)+\)/g, "")
     .replaceAll(/\s?[\[\(][\s,;–\-,]*[\)\]]\s?/g, "")
     .replaceAll(" (data not shown)", "")
-    .replaceAll(/\s?\(Table.*\)/g, "")
+    .replaceAll(/\s?\(Table \d+\w?\)/g, "")
     .replaceAll(/\s?\(ref\.\s\d+\)/g, "")
     .replaceAll(/\s+/g, " ")
     .replaceAll(/\.([A-Z])/g, ". $1")
@@ -268,8 +292,6 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .replaceAll(/,+/g, ",")
     .replaceAll(",.", ".")
     .replaceAll("\n", " ");
-
-  log("articleText: " + articleText)
 
   const doiFile = doi.replaceAll(/\//g, "_");
   fs.writeFileSync("output/" + doiFile + ".txt", articleText);
@@ -304,16 +326,18 @@ function slice(
   while (idx < sentences.length) {
     let chunk = "";
     let wordCount = 0;
+    let lastCount = 0;
     while (wordCount < chunkSize && idx < sentences.length) {
       const sentence = sentences[idx].trim();
-      wordCount += countWords(sentence);
+      lastCount = countWords(sentence);
+      wordCount += lastCount;
       chunk += " " + sentence;
       idx++;
     }
 
     console.log("chunk", chunk, "\n");
     documents.push({ doi, body: `${title}.${chunk}` });
-    if (idx < sentences.length - overlap) {
+    if (idx < sentences.length - overlap && lastCount < chunkSize) {
       idx -= overlap;
     }
   }

@@ -24,7 +24,8 @@ const DocsPage: NextPage<Props> = () => {
   const [keyword, setKeyword] = useState("");
   const [answer, setAnswer] = useState<String>("");
   const [maxChunks, setMaxChunks] = useState(8);
-  const [fakeAnswer, setFakeAnswer] = useState(false)
+  const [fakeAnswer, setFakeAnswer] = useState(false);
+  const [longContext, setLongContext] = useState(true);
   const question = userQ;
 
   const generateAnswer = async (e: any) => {
@@ -44,7 +45,8 @@ const DocsPage: NextPage<Props> = () => {
         question,
         keyword,
         maxChunks,
-        useFakeAnswer: fakeAnswer
+        useFakeAnswer: fakeAnswer,
+        longContext
       })
     });
     console.log("Edge function returned.");
@@ -83,66 +85,81 @@ const DocsPage: NextPage<Props> = () => {
       />
       <div className="flex flex-col items-center justify-center min-h-screen py-2 mx-auto">
         <main className="flex flex-col items-center justify-center flex-1 w-full min-h-screen px-4 py-2 mx-auto mt-12 text-center sm:mt-20">
-          <h1 className="max-w-xl text-2xl font-bold sm:text-4xl">
+          <h1 className="max-w-2xl text-2xl font-bold sm:text-4xl">
             Ask me anything<sup>*</sup> about science!
           </h1>
-          <div className="w-full max-w-xl">
-            <textarea
-              value={userQ}
-              onChange={(e) => setUserQ(e.target.value)}
-              rows={4}
-              className="w-full p-2 mt-5 mb-2 border rounded-md shadow-md bg-neutral border-neutral-focus "
-              placeholder={
-                "e.g. Describe the role of Pax6 and its role in neural progenitor cells in detail."
-              }
-            />
-
-            <div className="grid grid-cols-3  space-x-3 mb-2">
-              <div className="col-span-2">
-                <span className="text-left text-sm">
-                  Keyword(s) separated by comma
-                </span>
-                <input
-                  type="text"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  className="w-full p-2 my-2 border rounded-md shadow-md bg-neutral border-neutral-focus"
-                  placeholder={"e.g. Pax6"}
-                />
-              </div>
-              <div>
-                <span className="text-left text-sm">Max chunks per source</span>
-                <input
-                  type="number"
-                  value={maxChunks}
-                  onChange={(e) => setMaxChunks(parseInt(e.target.value))}
-                  className="w-full p-2 my-2 border rounded-md shadow-md bg-neutral border-neutral-focus text-right"
-                />
-              </div>
-            </div>
-            <span className="flex gap-x-1 items-center text-sm mb-4">
-              <input type="checkbox" checked={fakeAnswer}
-                onChange={(e) => setFakeAnswer(e.target.checked)}
+          <div className="w-full max-w-2xl flex flex-col items-center">
+            <div className="max-w-xl">
+              <textarea
+                value={userQ}
+                onChange={(e) => setUserQ(e.target.value)}
+                rows={4}
+                className="w-full p-2 mt-5 mb-2 border rounded-md shadow-md bg-neutral border-neutral-focus "
+                placeholder={
+                  "e.g. Describe the role of Pax6 and its role in neural progenitor cells in detail."
+                }
               />
-              Use fake answer prompting (slower but may give more related results)
-            </span>
 
-            {!loading && (
-              <button
-                className="w-full px-4 py-2 mt-2 font-medium btn btn-primary"
-                onClick={(e) => generateAnswer(e)}
-              >
-                Ask your question &rarr;
-              </button>
-            )}
-            {loading && (
-              <button
-                className="w-full px-4 py-2 mt-2 font-medium btn btn-primary"
-                disabled
-              >
-                <LoadingDots color="white" style="xl" />
-              </button>
-            )}
+              <div className="grid grid-cols-3  space-x-3 mb-2">
+                <div className="col-span-2">
+                  <span className="text-left text-sm">
+                    Keyword(s) separated by comma
+                  </span>
+                  <input
+                    type="text"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    className="w-full p-2 my-2 border rounded-md shadow-md bg-neutral border-neutral-focus"
+                    placeholder={"e.g. Pax6"}
+                  />
+                </div>
+                <div>
+                  <span className="text-left text-sm">
+                    Max chunks per source
+                  </span>
+                  <input
+                    type="number"
+                    value={maxChunks}
+                    onChange={(e) => setMaxChunks(parseInt(e.target.value))}
+                    className="w-full p-2 my-2 border rounded-md shadow-md bg-neutral border-neutral-focus text-right"
+                  />
+                </div>
+              </div>
+              <span className="flex gap-x-1 items-center text-sm mb-2">
+                <input
+                  type="checkbox"
+                  checked={longContext}
+                  onChange={(e) => setLongContext(e.target.checked)}
+                />
+                Long context (more comprehensive answer but triple the cost)
+              </span>
+              <span className="flex gap-x-1 items-center text-sm mb-4">
+                <input
+                  type="checkbox"
+                  checked={fakeAnswer}
+                  onChange={(e) => setFakeAnswer(e.target.checked)}
+                />
+                Fake answer prompting (slower but may give more related results)
+              </span>
+
+              {!loading && (
+                <button
+                  className="w-full px-4 py-2 mt-2 font-medium btn btn-primary"
+                  onClick={(e) => generateAnswer(e)}
+                >
+                  Ask your question &rarr;
+                </button>
+              )}
+              {loading && (
+                <button
+                  className="w-full px-4 py-2 mt-2 font-medium btn btn-primary"
+                  disabled
+                >
+                  <LoadingDots color="white" style="xl" />
+                </button>
+              )}
+            </div>
+
             <Toaster
               position="top-center"
               reverseOrder={false}
@@ -153,17 +170,15 @@ const DocsPage: NextPage<Props> = () => {
                 <motion.div className="my-10 space-y-10">
                   {answer && (
                     <>
-                      <div>
-                        <h2 className="mx-auto text-3xl font-bold sm:text-4xl">
-                          Here is your answer:{" "}
-                        </h2>
-                      </div>
+                      <h2 className="mx-auto text-2xl font-bold">
+                        Here is your answer:{" "}
+                      </h2>
                       {answer.split(/SOURCES?:/).map((splitanswer, index) => {
                         return (
                           <div
-                            className={`p-4 transition bg-neutral border border-neutral-focus shadow-md rounded-xl overflow-x-auto max-w-xl ${
+                            className={`p-4 transition bg-neutral border border-neutral-focus shadow-md rounded-xl overflow-x-auto max-w-2xl ${
                               index === 0
-                                ? "hover:border-accent-focus cursor-copy text-left"
+                                ? "hover:border-accent-focus text-left"
                                 : ""
                             }`}
                             key={index}
@@ -211,7 +226,6 @@ const DocsPage: NextPage<Props> = () => {
       </div>
       {/* // draw a line across the page with length of 80% */}
       <div className="w-4/5 mx-auto my-10 border-b border-white/0"></div>
-
 
       <Embeddings />
     </>

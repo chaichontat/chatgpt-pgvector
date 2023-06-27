@@ -26,12 +26,14 @@ const handler = async (req: Request): Promise<Response> => {
 
   // console.log(req);
 
-  const { question, keywords, maxChunks, useFakeAnswer } = (await req.json()) as {
-    question?: string;
-    keywords?: string;
-    maxChunks?: number;
-    useFakeAnswer?: boolean;
-  };
+  const { question, keywords, maxChunks, useFakeAnswer, longContext } =
+    (await req.json()) as {
+      question?: string;
+      keywords?: string;
+      maxChunks?: number;
+      useFakeAnswer?: boolean;
+      longContext?: boolean;
+    };
   console.log(question);
 
   if (!question) {
@@ -60,7 +62,7 @@ const handler = async (req: Request): Promise<Response> => {
         },
         {
           role: "user",
-          content: `As a world-renowned biologist, write an answer to the following question in 2-3 sentences. Be very specific and use technical terms without any restraint. Just assume everything that is not known.  \n\nQ: ${ input }`
+          content: `As a world-renowned biologist, write an answer to the following question in 2-3 sentences. Be very specific and use technical terms without any restraint. Just assume everything that is not known.  \n\nQ: ${input}`
         }
       ],
       temperature: 0.5,
@@ -83,13 +85,13 @@ const handler = async (req: Request): Promise<Response> => {
       fakeAnswer = fakeAnswer + decoder.decode(value);
     }
     console.log("fakeAnswer: ", fakeAnswer);
-    input = fakeAnswer
+    input = fakeAnswer;
   }
 
   const embeddingResponse = await fetch(apiURL + "/v1/embeddings", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${ apiKey }`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -114,7 +116,7 @@ const handler = async (req: Request): Promise<Response> => {
   //     match_count: 60 // Choose the number of matches
   //   }
   // );
-  console.log("keywords: ", keywords)
+  console.log("keywords: ", keywords);
   const { data: documents, error } = await supabaseClient.rpc(
     keywords ? "match_keywords" : "match_documents",
     {
@@ -168,11 +170,11 @@ const handler = async (req: Request): Promise<Response> => {
     tokenCount += encoded.text.length;
 
     // Limit context to max 1500 tokens (configurable)
-    if (tokenCount > 6000) {
+    if (tokenCount > (longContext ? 6000 : 2000)) {
       break;
     }
 
-    contextText += `${ content.trim() }\nSOURCE: ${ doi }\n---\n`;
+    contextText += `${content.trim()}\nSOURCE: ${doi}\n---\n`;
   }
 
   console.log(tokenCount);
@@ -211,10 +213,10 @@ SOURCES:
 10.1126/sciadv.abg3777`);
 
   const userMessage = stripIndent(`CONTEXT:
-  ${ contextText }
+  ${contextText}
 
   QUESTION:
-  Do not include a summary (i.e. overall...). Answer in a precise and technical manner from CONTEXT, ${ query }
+  Answer in a precise and technical manner from CONTEXT and include the SOURCES section at the end of your answer, ${query}.
   `);
 
   const messages = [
@@ -239,16 +241,25 @@ SOURCES:
   console.log("messages: ", messages);
 
   const payload: OpenAIStreamPayload = {
-    model: "gpt-3.5-turbo-16k",
+    model: longContext ? "gpt-3.5-turbo-16k" : "gpt-3.5-turbo",
     messages: messages,
     temperature: 0.5,
     top_p: 1,
     frequency_penalty: 0,
     presence_penalty: 0,
-    max_tokens: 1500,
+    max_tokens: longContext ? 1500 : 1000,
     stream: true,
     n: 1,
-    logit_bias: { 18049: -100, 1593: -100, 3465: -100, 7247: -100, 2102: -100, 11: -2 } // remove important, note, understood, however
+    logit_bias: {
+      "18049": -90,
+      "1593": -90,
+      "3465": -90,
+      "7247": -90,
+      "2102": -90,
+      "11": -2,
+      "8780": -90,
+      "10061": -90
+    } // remove important, note, understood, however
   };
 
   const stream = await OpenAIStream(payload);

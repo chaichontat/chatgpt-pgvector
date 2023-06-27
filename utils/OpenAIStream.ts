@@ -7,14 +7,14 @@ import {
 export interface OpenAIStreamPayload {
   model: string;
   messages: { role: string; content: string }[];
-  temperature: number;
-  top_p: number;
-  frequency_penalty: number;
-  presence_penalty: number;
+  temperature?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
   max_tokens: number;
   stream: boolean;
   n: number;
-  logit_bias: Record<number, number>;
+  logit_bias?: Record<number, number>;
 }
 
 export async function OpenAIStream(payload: OpenAIStreamPayload) {

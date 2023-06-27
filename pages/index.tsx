@@ -5,9 +5,11 @@ import Link from "next/link";
 import DocsPage from "./docs";
 
 const HomePage: NextPage = () => {
-  return <>
-    <DocsPage />
-  </>
+  return (
+    <>
+      <DocsPage />
+    </>
+  );
   return (
     <div className="flex flex-col justify-center min-h-screen antialiased text-center text-slate-50">
       <div className="flex flex-col items-center px-6 m-auto mx-auto max-w-7xl">

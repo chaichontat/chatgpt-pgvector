@@ -47,9 +47,7 @@ const Embeddings: NextPage = () => {
       <h1 className="w-full my-5 text-2xl font-bold sm:text-4xl ">
         Generate embeddings
       </h1>
-      <p className="mb-6">
-        Paste a list of URLs below to generate embeddings.
-      </p>
+      <p className="mb-6">Paste a list of URLs below to generate embeddings.</p>
       <form onSubmit={handleSubmit}>
         <textarea
           className="w-full h-[150px] textarea textarea-bordered"
