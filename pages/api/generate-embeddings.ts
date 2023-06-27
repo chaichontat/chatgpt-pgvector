@@ -1,16 +1,20 @@
 import { supabaseClient } from "@/lib/embeddings-supabase";
 import * as cheerio from "cheerio";
-import { last } from "cheerio/lib/api/traversing";
-import { log } from "console";
 import fs from "fs";
 import { NextApiRequest, NextApiResponse } from "next";
 import puppeteer, { Browser } from "puppeteer";
-import { Readable, ReadableOptions, Stream } from "stream";
+import { Readable, ReadableOptions } from "stream";
 import { uploadMetadata } from "./doistuffs";
 import { cleaners } from "./sitespecific";
 // embedding doc sizes
 
 let browserPromise = puppeteer.launch({ headless: "new" });
+const apiKey = process.env.OPENAI_API_KEY;
+
+const apiURL =
+  process.env.OPENAI_PROXY == ""
+    ? "https://api.openai.com"
+    : process.env.OPENAI_PROXY;
 
 type Docs = { doi: string; body: string }[];
 
@@ -88,16 +92,62 @@ export default async function handle(
   }
 }
 
+async function submit({ body, doi }: { body: string; doi: string }) {
+  if (body.length < 100) {
+    stream.log("skipping document with length < 100");
+    return;
+  }
+
+  const input = body.replaceAll(/\n/g, " ");
+
+  console.log("\nDocument length: \n", body.length);
+  console.log("\nURL: \n", doi);
+  let embedding: string = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const embeddingResponse = await fetch(apiURL + "/v1/embeddings", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        input,
+        model: "text-embedding-ada-002"
+      })
+    });
+    // console.log("\nembeddingResponse: \n", embeddingResponse);
+    const embeddingData = await embeddingResponse.json();
+
+    try {
+      [{ embedding }] = embeddingData.data;
+    } catch (error) {
+      stream.log("error in embeddingData: " + error);
+      console.error("error in embeddingData: " + error);
+      await new Promise((r) => setTimeout(r, 30000));
+      continue;
+    } finally {
+      break;
+    }
+  }
+
+  if (embedding) {
+    try {
+      await supabaseClient.from("documents").insert({
+        content: input,
+        embedding,
+        doi
+      });
+    } catch (error) {
+      stream.log("error in supabase insert: " + error);
+      console.error("error in supabase insert: " + error);
+    }
+  }
+  stream.log(".");
+}
+
 async function main(stream: CustomReadableStream, urls: string[]) {
   const documents = await getDocuments(urls);
   console.log("sending documents");
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  const apiURL =
-    process.env.OPENAI_PROXY == ""
-      ? "https://api.openai.com"
-      : process.env.OPENAI_PROXY;
-
   // Reset related to DOI.
   if (documents) {
     await supabaseClient.from("documents").delete().eq("doi", documents[0].doi);
@@ -105,58 +155,7 @@ async function main(stream: CustomReadableStream, urls: string[]) {
 
   stream.log("Working");
 
-  for (const { body, doi } of documents) {
-    if (body.length < 100) {
-      stream.log("skipping document with length < 100");
-      continue;
-    }
-    stream.log(".");
-
-    const input = body.replaceAll(/\n/g, " ");
-
-    console.log("\nDocument length: \n", body.length);
-    console.log("\nURL: \n", doi);
-    let embedding: string = "";
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const embeddingResponse = await fetch(apiURL + "/v1/embeddings", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          input,
-          model: "text-embedding-ada-002"
-        })
-      });
-      // console.log("\nembeddingResponse: \n", embeddingResponse);
-      const embeddingData = await embeddingResponse.json();
-
-      try {
-        [{ embedding }] = embeddingData.data;
-      } catch (error) {
-        stream.log("error in embeddingData: " + error);
-        console.error("error in embeddingData: " + error);
-        await new Promise((r) => setTimeout(r, 30000));
-        continue;
-      } finally {
-        break;
-      }
-    }
-
-    if (embedding) {
-      try {
-        await supabaseClient.from("documents").insert({
-          content: input,
-          embedding,
-          doi
-        });
-      } catch (error) {
-        stream.log("error in supabase insert: " + error);
-        console.error("error in supabase insert: " + error);
-      }
-    }
-  }
+  await Promise.all(documents.map(submit));
   stream.log("\nDone");
 }
 
@@ -204,7 +203,7 @@ async function getDocuments(urls: string[]) {
           break;
         }
         stream.log("error in getDocuments: " + error);
-        console.error("error in getDocuments: " + error);
+        console.trace(error)
         attempt++;
       }
     }
@@ -215,7 +214,7 @@ async function getDocuments(urls: string[]) {
 
 function convertCell(url: string) {
   const match = url.match(
-    /^https:\/\/www\.cell\.com\/[a-z]+\/fulltext\/(S.+)$/i
+    /^https:\/\/www\.cell\.com\/[a-z\-]+\/fulltext\/(S.+)$/i
   );
   if (match) {
     return `https://www.sciencedirect.com/science/article/pii/${match[1].replace(
@@ -268,8 +267,10 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .split(" ")
     .map((el) => $(el).text())
     .join(" ")
-    .replaceAll("e.g.", "such as")
+    .replaceAll(/(e\.g\.)|(i\.e\.)/g, "such as")
     .replaceAll("Supplementary ", "")
+    .replaceAll(/\(Box\s\d*\)/g, "")
+    .replaceAll(/et al\.,?\s?/g, "")
     .replaceAll(/ref\.\s?/g, "")
     .replaceAll("Figure ", "")
     .replaceAll("for review see ", "")
@@ -278,8 +279,11 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .replaceAll("(refs)", "")
     .replaceAll(/["“]Methods[”"]/g, "")
     .replaceAll("Extended", "")
-    .replaceAll(/(Note(s?)|Fig\.|Video(s?)|Data)\s?[\d+\.]*/g, "")
-    .replaceAll("Fig. ", "")
+    .replaceAll(/([Tt]able|Note(s?)|[Ff]igs?\.|[Vv]ideo(s?)|Data)\s?([\w+\.,]( and)?)*/g, "")
+    .replaceAll(/\s?\([\s\d]+\)/g, "")
+    .replaceAll(/[A-Z] (to|and) [A-Z]/g, "")
+    .replaceAll(/Figs?\. [S?\d\w]+/gi, "")
+    .replaceAll(/\((\s?and\s?)+\)/g, "")
     .replaceAll(" ;", "")
     .replaceAll(/\([A-Z](,\s[A-Z])*\)/g, "")
     .replaceAll(/\(([,;\s]|and)+\)/g, "")
@@ -291,6 +295,8 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .replaceAll(/\.([A-Z])/g, ". $1")
     .replaceAll(/<[^>]*>/gm, "")
     .replaceAll(/\s+([,.])/g, "$1")
+    .replaceAll(/\([;,\s\-]/g, "(")
+    .replaceAll(/[;,\s\-]\)/g, ")")
     .replaceAll(/,+/g, ",")
     .replaceAll(",.", ".")
     .replaceAll("\n", " ");

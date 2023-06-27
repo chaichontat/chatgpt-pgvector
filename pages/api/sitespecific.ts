@@ -12,7 +12,7 @@ function genAvoidSelection(names: string[], tag: string) {
   return names.map((name) => `section[${tag}*="${name}"]`).join(", ");
 }
 
-const toRemove = [
+const junkWords = [
   "ethods",
   "References",
   "Conflict",
@@ -24,13 +24,17 @@ const toRemove = [
   "Funding",
   "nterest",
   "author",
-  "Declaration",
+  "eclaration",
   "Related",
   "vailability",
   "ontributions",
   "bbreviation",
   "Publisher",
-  "tatement"
+  "tatement",
+  "slides",
+  "lossary",
+  "ermissions",
+  "About"
 ];
 
 export const cleaners: Record<string, Cleaner> = {
@@ -50,13 +54,13 @@ export const cleaners: Record<string, Cleaner> = {
   nih: {
     goodClass: ".sec",
     toRemove:
-      "[id^=fn], [id^=ref], [id^=ack], [id^=app], [id^=note], [id^=funding], .fig, a, .table-wrap, h1, h2, h3, h4",
+      '[id^=fn], [id^=ref], [id^=ack], [id^=app], [id^=note], [id^=funding], [id^=B], .fig, a, .table-wrap, .sec:has(h2:contains("cknowled")), .sec:has(h2:contains("ETHODS")), .sec:has(h2:contains("ppendi")), h1, h2, h3, h4',
     doiTag: "meta[name=citation_doi]"
   },
   science: {
     goodClass: "#abstracts #bodymatter",
     toRemove:
-      '.figure-wrap, section[role="doc-acknowledgments"], a, section[data-type*="ethod"]',
+      'aside, .figure-wrap, section[role="doc-acknowledgments"], a, h1, h2, h3, h4, section[data-type*="ethod"]',
     doiTag: "meta[name=dc.Identifier][scheme=doi]"
   },
   pnas: {
@@ -111,7 +115,7 @@ export const cleaners: Record<string, Cleaner> = {
   frontiersin: {
     goodClass: ".article-section",
     toRemove:
-      toRemove.map((x) => `h2:contains("${x}") + p`).join(", ") +
+      junkWords.map((x) => `h2:contains("${x}") + p`).join(", ") +
       ' , a, h1, div + .referenceslink, h1, h2, h3, h4, .Imageheaders, .FigureDesc, .References, .authors, .notes, .clear, .AbstractSummary, script, .article-header-container, [name^=B], .AbstractSummary, [class^="meta"], p:contains("conflicts of interest")',
     doiTag: "meta[name=citation_doi]",
     runFunc: ($: cheerio.CheerioAPI) => {
@@ -139,9 +143,33 @@ export const cleaners: Record<string, Cleaner> = {
   oup: {
     goodClass: 'div[data-widgetname="ArticleFulltext"]',
     toRemove:
-      "[class*=meta], a, h1, h2, h3, .ref-list, .authorNotes-section-title, .footnote, .copyright, .license, .fig, [class^=table]",
+      "[class*=meta], a, h1, h2, h3, h4, .ref-list, .authorNotes-section-title, .footnote, .copyright, .license, .fig, [class^=table]",
     doiTag: "meta[name=citation_doi]",
     runFunc: ($: cheerio.CheerioAPI) => {
+      $(".section-title").each((i, elem) => {
+        if (
+          !$(elem)
+            .text()
+            .match(
+              /(methods|materials|contributions|supplement|funding|conflict|statement|copyright|publisher|license|notes|availabilit|declar|acknowl)/i
+            )
+        ) {
+          return;
+        }
+
+        const next = $(elem).nextAll();
+        const junk = [];
+        while (next.length) {
+          const nextElem = next.first();
+          if (nextElem.is("h2")) {
+            break;
+          }
+          junk.push(nextElem);
+          next.splice(0, 1);
+        }
+        junk.forEach((x) => x.remove());
+      });
+
       $(".chapter-para").each((i, elem) => {
         const prev = $(elem).prev();
         if (prev.is('h2[class^="back"]')) {
@@ -166,7 +194,7 @@ export const cleaners: Record<string, Cleaner> = {
   annualreviews: {
     goodClass: ".article-content",
     toRemove:
-      '[class*=word], .article-tools, .figure-container, script, [class*=equation], sup, .formulaLabel, .ack, .lit-cited, .ar-modal .mfp-hide, a, h1, h2, h3, h4, p:contains("received funding"), p:contains("affiliation")',
+      '[class*=word], .article-tools, .figure-container, script, [class*=equation], sup, .formulaLabel, .ack, .lit-cited, .ar-modal, .mfp-hide, a:not([href*=dl]), h1, h2, h3, h4, p:contains("received funding"), p:contains("affiliation"), p:contains("cofounder"), p:contains("consultant")',
     doiTag: "meta[name=dc.Identifier]"
   }
 } as const;
@@ -174,11 +202,11 @@ export const cleaners: Record<string, Cleaner> = {
 function sciencedirectCleaner($: cheerio.CheerioAPI) {
   $("section").each((i, elem) => {
     if (
-      $(elem).has(toRemove.map((x) => `h2:contains("${x}")`).join(", "))
+      $(elem).has(junkWords.map((x) => `h2:contains("${x}")`).join(", "))
         .length ||
-      $(elem).has(toRemove.map((x) => `h3:contains("${x}")`).join(", "))
+      $(elem).has(junkWords.map((x) => `h3:contains("${x}")`).join(", "))
         .length ||
-      $(elem).has(toRemove.map((x) => `h4:contains("${x}")`).join(", ")).length
+      $(elem).has(junkWords.map((x) => `h4:contains("${x}")`).join(", ")).length
     ) {
       $(elem).remove();
     }
