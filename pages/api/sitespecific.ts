@@ -34,8 +34,12 @@ const junkWords = [
   "slides",
   "lossary",
   "ermissions",
-  "About"
+  "About",
+  "nterests"
 ];
+
+const junkRegex =
+  /(methods|materials|contributions|supplement|funding|conflict|statement|copyright|publisher|license|notes|availabilit|declar|acknowl|interests)/i;
 
 export const cleaners: Record<string, Cleaner> = {
   nature: {
@@ -52,9 +56,10 @@ export const cleaners: Record<string, Cleaner> = {
     runFunc: sciencedirectCleaner
   },
   nih: {
+    // ncbi
     goodClass: ".sec",
     toRemove:
-      '[id^=fn], [id^=ref], [id^=ack], [id^=app], [id^=note], [id^=funding], [id^=B], .fig, a, .table-wrap, .sec:has(h2:contains("cknowled")), .sec:has(h2:contains("ETHODS")), .sec:has(h2:contains("ppendi")), h1, h2, h3, h4',
+      '[id^=fn], [id^=ref], [id^=ack], [id^=app], [id^=note], [id^=funding], [id^=B], [id^=glos], .fig, a, .table-wrap, .sec:has(h2:contains("cknowled")), .sec:has(h2:contains("ETHODS")), .sec:has(h2:contains("ppendi")), h1, h2, h3, h4',
     doiTag: "meta[name=citation_doi]"
   },
   science: {
@@ -147,13 +152,7 @@ export const cleaners: Record<string, Cleaner> = {
     doiTag: "meta[name=citation_doi]",
     runFunc: ($: cheerio.CheerioAPI) => {
       $(".section-title").each((i, elem) => {
-        if (
-          !$(elem)
-            .text()
-            .match(
-              /(methods|materials|contributions|supplement|funding|conflict|statement|copyright|publisher|license|notes|availabilit|declar|acknowl)/i
-            )
-        ) {
+        if (!$(elem).text().match(junkRegex)) {
           return;
         }
 
@@ -195,7 +194,51 @@ export const cleaners: Record<string, Cleaner> = {
     goodClass: ".article-content",
     toRemove:
       '[class*=word], .article-tools, .figure-container, script, [class*=equation], sup, .formulaLabel, .ack, .lit-cited, .ar-modal, .mfp-hide, a:not([href*=dl]), h1, h2, h3, h4, p:contains("received funding"), p:contains("affiliation"), p:contains("cofounder"), p:contains("consultant")',
-    doiTag: "meta[name=dc.Identifier]"
+    doiTag: "meta[name=dc.Identifier]",
+    runFunc: ($: cheerio.CheerioAPI) => {
+      $("p").each((i, elem) => {
+        const prev = $(elem).prev();
+        if (prev.is("h2") && prev.text().match(junkRegex)) {
+          $(elem).remove();
+        }
+      });
+    }
+  },
+  physiology: {
+    goodClass: ".hlFld-Abstract .hlFld-Fulltext",
+    toRemove: "figure, .ack, .tableToggle, .figure-extra, a, h1, h2, h3, h4",
+    doiTag: "meta[name=dc.Identifier]",
+    runFunc: ($: cheerio.CheerioAPI) => {
+      $("[class^=sec]").each((i, elem) => {
+        if (
+          $(elem).has(junkWords.map((x) => `h1:contains("${x}")`).join(", "))
+            .length
+        ) {
+          $(elem).remove();
+        }
+      });
+    }
+  },
+  embopress: {
+    goodClass: ".article__body",
+    toRemove: "#reference, [class*=supporting], figure, a, h1, h2, h3, h4",
+    doiTag: "meta[name=dc.identifier]",
+    runFunc: ($: cheerio.CheerioAPI) => {
+      $(".article-section__content").each((i, elem) => {
+        if (
+          $(elem).has(junkWords.map((x) => `h2:contains("${x}")`).join(", "))
+            .length
+        ) {
+          $(elem).remove();
+        }
+      });
+    }
+  },
+  springer: {
+    goodClass: '[data-title="Abstract"] .main-content',
+    toRemove:
+      ".c-article__sub-heading, .c-article-subject-list, [data-test=chapter-cobranding-and-download], figure, a, h1, h2, h3, h4",
+    doiTag: "meta[name=citation_doi]"
   }
 } as const;
 

@@ -8,7 +8,10 @@ import { uploadMetadata } from "./doistuffs";
 import { cleaners } from "./sitespecific";
 // embedding doc sizes
 
-let browserPromise = puppeteer.launch({ headless: "new" });
+let browserPromise = puppeteer.launch({
+  headless: "new",
+  defaultViewport: { width: 1600, height: 1200 }
+});
 const apiKey = process.env.OPENAI_API_KEY;
 
 const apiURL =
@@ -203,7 +206,7 @@ async function getDocuments(urls: string[]) {
           break;
         }
         stream.log("error in getDocuments: " + error);
-        console.trace(error)
+        console.trace(error);
         attempt++;
       }
     }
@@ -214,7 +217,7 @@ async function getDocuments(urls: string[]) {
 
 function convertCell(url: string) {
   const match = url.match(
-    /^https:\/\/www\.cell\.com\/[a-z\-]+\/fulltext\/(S.+)$/i
+    /^https:\/\/www\.cell\.com\/[a-z\-/]+\/fulltext\/(S.+)$/i
   );
   if (match) {
     return `https://www.sciencedirect.com/science/article/pii/${match[1].replace(
@@ -234,7 +237,8 @@ async function run(documents: Docs, browser: Browser, url: string) {
   stream.log("Running", fetchURL, "\n");
 
   const page = await browser.newPage();
-  await page.goto(fetchURL, { waitUntil: "networkidle0" });
+  await page.goto(fetchURL, { waitUntil: "networkidle2" });
+  console.log("network idle");
   const actualURL = page.url();
   const hostname = extractHostname(actualURL) as keyof typeof cleaners;
   if (!(hostname in cleaners)) {
@@ -270,16 +274,20 @@ async function run(documents: Docs, browser: Browser, url: string) {
     .replaceAll(/(e\.g\.)|(i\.e\.)/g, "such as")
     .replaceAll("Supplementary ", "")
     .replaceAll(/\(Box\s\d*\)/g, "")
+    .replaceAll(/\((preprint: )?[\w\-]+ et al.*?\)/g, "")
     .replaceAll(/et al\.,?\s?/g, "")
     .replaceAll(/ref\.\s?/g, "")
-    .replaceAll("Figure ", "")
+    .replaceAll(
+      /([Tt]able|Note(s?)|[Ff]igs?\.?|[Vv]ideo(s?)|Data)\s?([\w+\.,]( and)?)*/g,
+      ""
+    )
+    .replaceAll(/Fig(ure )?/g, "")
     .replaceAll("for review see ", "")
     .replaceAll("review in", "")
     .replaceAll(/ Additional file :?\s?\w+(and )?/g, "")
     .replaceAll("(refs)", "")
     .replaceAll(/["“]Methods[”"]/g, "")
     .replaceAll("Extended", "")
-    .replaceAll(/([Tt]able|Note(s?)|[Ff]igs?\.|[Vv]ideo(s?)|Data)\s?([\w+\.,]( and)?)*/g, "")
     .replaceAll(/\s?\([\s\d]+\)/g, "")
     .replaceAll(/[A-Z] (to|and) [A-Z]/g, "")
     .replaceAll(/Figs?\. [S?\d\w]+/gi, "")

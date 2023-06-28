@@ -3,6 +3,7 @@ import { useState } from "react";
 import ResizablePanel from "@/components/ResizablePanel";
 import { AnimatePresence, motion } from "framer-motion";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import Query from "@/components/Query";
 
 const Embeddings: NextPage = () => {
   const [urls, setUrls] = useState<string[]>([]);
@@ -100,6 +101,8 @@ const Embeddings: NextPage = () => {
           </motion.div>
         </AnimatePresence>
       </ResizablePanel>
+
+      <Query />
     </div>
   );
 };

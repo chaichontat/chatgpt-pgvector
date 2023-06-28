@@ -9,7 +9,6 @@ import MetaTags from "@/components/MetaTags";
 import { ReactNode } from "react";
 import { PageMeta } from "../types";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { use } from "react";
 import { Link } from "@/components/Links";
 import Embeddings from "./embeddings";
 
@@ -31,6 +30,10 @@ const DocsPage: NextPage<Props> = () => {
   const generateAnswer = async (e: any) => {
     e.preventDefault();
     if (!userQ) {
+      return toast.error("Please enter a question!");
+    }
+
+    if (question.startsWith("https://")) {
       return toast.error("Please enter a question!");
     }
 
@@ -125,22 +128,22 @@ const DocsPage: NextPage<Props> = () => {
                   />
                 </div>
               </div>
-              <span className="flex gap-x-1 items-center text-sm mb-2">
+              <label className="flex gap-x-1 items-center text-sm mb-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={longContext}
                   onChange={(e) => setLongContext(e.target.checked)}
                 />
                 Long context (more comprehensive answer but triple the cost)
-              </span>
-              <span className="flex gap-x-1 items-center text-sm mb-4">
+              </label>
+              <label className="flex gap-x-1 items-center text-sm mb-4 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={fakeAnswer}
                   onChange={(e) => setFakeAnswer(e.target.checked)}
                 />
                 Fake answer prompting (slower but may give more related results)
-              </span>
+              </label>
 
               {!loading && (
                 <button
