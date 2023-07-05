@@ -54,7 +54,9 @@ const Embeddings: NextPage = () => {
           className="w-full h-[150px] textarea textarea-bordered"
           placeholder="Enter URLs here"
           value={urls.join("\n")}
-          onChange={(e) => setUrls(e.target.value.split("\n"))}
+          onChange={(e) =>
+            setUrls(e.target.value.split("\n").filter((url) => url !== ""))
+          }
         />
         <button
           className="my-4 btn btn-primary"
@@ -102,7 +104,7 @@ const Embeddings: NextPage = () => {
         </AnimatePresence>
       </ResizablePanel>
 
-      <Query />
+      {/* <Query /> */}
     </div>
   );
 };

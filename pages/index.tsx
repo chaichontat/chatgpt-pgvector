@@ -7,7 +7,7 @@ import DocsPage from "./docs";
 const HomePage: NextPage = () => {
   return (
     <>
-      <DocsPage />
+      <DocsPage children />
     </>
   );
   return (

@@ -183,21 +183,22 @@ const handler = async (req: Request): Promise<Response> => {
 
   const systemContent =
     stripIndent(`"You are a research assistant who values precision and factuality.
-  You will only reply in a straightforward manner in bullet points. Never say "as an AI language model"; never use hedging language like "but remember that", never tack on "However, note that..." or "Remember that..." or "Please note that...", or anything similar at the ends of replies.
+  You will only reply in a straightforward manner in bullet points.
   Your goal is to answer QUESTION thoroughly and correctly using as much of the CONTEXT as possible.
-  The CONTEXT is a list of independent facts that you can use to answer the QUESTION. Do not assume that text from different CONTEXT sections are related.
+  The CONTEXT is a list of independent facts that you can use to answer the QUESTION.
+  Do not assume that text from different CONTEXT sections are related.
   Think step-by-step on how CONTEXT can be used to clarify and increase the detail of your answer.
   You must absolutely ensure the reference matches what you say in the answer.
   Use precise language and incorporate relevant technical terms or jargon as the reader is an expert scientist.
+  You will utilize as much technical terms/keywords as possible.
   I do not appreciate layman's terms or vague/general language.
-  Do not include a summary (i.e. overall...). I want only facts. Be direct.
-  If you are unsure, you say "Sorry, I don't know."
-  The CONTEXT includes DOIs, always include them under a SOURCES heading at the end of your response.
+  If you are unsure, you say "Sorry, I don't know. Please add relevant papers to my database."
+  The CONTEXT includes DOIs, always include them under a SOURCES heading at the very end of your response.
   Always list all DOIs from the CONTEXT, but never list a DOI more than once.
   Never include DOIs that are not in the CONTEXT sections.`);
 
   const userContent = stripIndent(`CONTEXT:
-  From this reference, hypothalamic tanycytes are radial glial cells that line the ventricular walls of the mediobasal third ventricle. Tanycytes are subdivided into alpha1, alpha2, beta1, and beta2 subtypes based on dorsoventral position and marker gene expression and closely resemble neural progenitors in morphology and gene expression profile. Tanycytes have been reported to generate small numbers of neurons and glia in the postnatal period, although at much lower levels than in more extensively characterized sites of ongoing neurogenesis, such as the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus.
+  Hypothalamic tanycytes are radial glial cells that line the ventricular walls of the mediobasal third ventricle. Tanycytes are subdivided into alpha1, alpha2, beta1, and beta2 subtypes based on dorsoventral position and marker gene expression and closely resemble neural progenitors in morphology and gene expression profile. Tanycytes have been reported to generate small numbers of neurons and glia in the postnatal period, although at much lower levels than in more extensively characterized sites of ongoing neurogenesis, such as the subventricular zone of the lateral ventricles or the subgranular zone of the dentate gyrus.
   SOURCE: 10.1126/sciadv.abg3777
   ---
 
@@ -251,16 +252,27 @@ SOURCES:
     max_tokens: longContext ? 1500 : 1000,
     stream: true,
     n: 1,
-    logit_bias: {
-      "18049": -90,
-      "1593": -90,
-      "3465": -90,
-      "7247": -90,
-      "2102": -90,
-      "11": -2,
-      "8780": -90,
-      "10061": -90
-    } // remove important, note, understood, however
+    logit_bias: {  // remove botsplaining
+      3062: -100, // important
+      5296: -100, // note
+      16365: -100, // understood
+      4452: -100, // However
+      374: -2, // is
+      28993: -100, // Overall
+      15592: -100, // AI
+      12741: -100, // distinct
+      88436: -100, // CONTEXT
+      3619: -100, // understand
+      71251: -100, // Understanding
+      46551: -100, // Understanding
+      15903: -100, // Further
+      10555: -100, // noted
+      26579: -100, // acknowledged
+      1288: -100, // should
+      2181: -50, // It
+      28589: -100, // Overall
+      12399: -100, // summary
+    }
   };
 
   const stream = await OpenAIStream(payload);

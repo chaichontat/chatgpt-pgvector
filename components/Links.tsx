@@ -1,20 +1,22 @@
 import { useState, useEffect } from "react";
-import { supabaseClient } from "@/lib/embeddings-supabase";
 import { LRUCache } from "lru-cache";
+import { uploadMetadata } from "pages/api/doistuffs";
 
 const cache = new LRUCache<string, string>({ max: 1000 });
 
-async function getMetadata(doi: string) {
-  if (cache.has(doi)) {
-    return cache.get(doi) as string;
-  }
-
-  const resp = await supabaseClient
-    .from("citation")
-    .select("*")
-    .eq("doi", doi)
-    .single();
-  const data = resp.data as {
+async function _get(doi: string) {
+  const resp = await fetch(
+    `/api/citations`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ doi }),
+    }
+  );
+  console.log(resp)
+  return (await resp.json()) as {
     id: number;
     doi: string;
     title: string;
@@ -22,8 +24,16 @@ async function getMetadata(doi: string) {
     year: number;
     journal: string;
   };
+}
+
+async function getMetadata(doi: string) {
+  if (cache.has(doi)) {
+    return cache.get(doi) as string;
+  }
+
+  let data = await _get(doi);
+  console.log(data)
   if (!data) {
-    console.error("No data for doi", doi);
     return doi;
   }
   const out = `${data.first_author} et al. (${data.year}). ${data.title}. <i>${data.journal}</i>.`;

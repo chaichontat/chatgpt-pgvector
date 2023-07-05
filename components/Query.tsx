@@ -1,12 +1,12 @@
 import { useState } from "react";
 import DataTable from "./DataTableBase";
-import { ExpanderComponentProps } from "react-data-table-component";
 
 const columns = [
   "title",
   "journal",
   "citations",
   "doi",
+  "date",
   "abstract",
   "authors"
 ] as const;
@@ -34,7 +34,7 @@ const CustomTitle = ({ row }: { row: Result }) => (
       data-tag="allowRowEvents"
       className="text-left overflow-hidden text-sm whitespace-pre-wrap overflow-ellipsis text-neutral-500"
     >
-      {row.authors} et al. <i>{row.journal}</i> ({row.year}) Cited by{" "}
+      {row.authors} et al. <i>{row.journal}</i> ({row.date}) Cited by{" "}
       {row.citations}
     </div>
   </div>

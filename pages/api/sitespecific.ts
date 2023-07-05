@@ -6,6 +6,7 @@ type Cleaner = {
   toRemove: string;
   doiTag: string;
   runFunc?: ($: cheerio.CheerioAPI) => void;
+  urlConverter?: (url: string) => string;
 };
 
 function genAvoidSelection(names: string[], tag: string) {
@@ -13,10 +14,9 @@ function genAvoidSelection(names: string[], tag: string) {
 }
 
 const junkWords = [
-  "ethods",
+  "Methods",
   "References",
   "Conflict",
-  "contact",
   "cknowledg",
   "Supplementary",
   "Supplemental",
@@ -27,7 +27,8 @@ const junkWords = [
   "eclaration",
   "Related",
   "vailability",
-  "ontributions",
+  "Author contributions",
+  "Author Contributions",
   "bbreviation",
   "Publisher",
   "tatement",
@@ -35,21 +36,29 @@ const junkWords = [
   "lossary",
   "ermissions",
   "About",
-  "nterests"
+  "nterests",
+  "nformation",
+  "ompliance",
+  "thical",
+  "appendi",
+  "statement",
+  "sponsorship",
+  "version",
+  "summary",
+  "peer review"
 ];
 
-const junkRegex =
-  /(methods|materials|contributions|supplement|funding|conflict|statement|copyright|publisher|license|notes|availabilit|declar|acknowl|interests)/i;
+const junkRegex = new RegExp(junkWords.join("|"), "gi");
 
 export const cleaners: Record<string, Cleaner> = {
   nature: {
     goodClass: ".main-content section[data-title=Abstract]",
     toRemove:
       'a:not([href*="Glos"]), h2, h3, h4, sup, .c-article-table, .c-article-section__figure, section[data-title*="ethods"], .c-article-box__button-text, .c-article-box',
-    doiTag: "meta[name=citation_doi]"
+    doiTag: "meta[name*=doi]"
   },
   sciencedirect: {
-    goodClass: ".abstract.author .Body",
+    goodClass: ".Body #abstracts",
     toRemove:
       'a:not([href*="topic"]), h1, h2, h3, h4, figure, [id^=ack], .Appendices, [name^=bbib], .article-textbox, .tables, [class*="navigation"], .list, .display',
     doiTag: "meta[name=citation_doi]",
@@ -59,11 +68,18 @@ export const cleaners: Record<string, Cleaner> = {
     // ncbi
     goodClass: ".sec",
     toRemove:
-      '[id^=fn], [id^=ref], [id^=ack], [id^=app], [id^=note], [id^=funding], [id^=B], [id^=glos], .fig, a, .table-wrap, .sec:has(h2:contains("cknowled")), .sec:has(h2:contains("ETHODS")), .sec:has(h2:contains("ppendi")), h1, h2, h3, h4',
-    doiTag: "meta[name=citation_doi]"
+      "[id^=fn], [id^=ref], [id^=ack], [id^=app], [id^=note], [id^=funding], [id^=B], [id^=glos], .fig, a, .table-wrap, h1, h2, h3, h4",
+    doiTag: "meta[name=citation_doi]",
+    runFunc: ($: cheerio.CheerioAPI) => {
+      $(".sec").each((i, elem) => {
+        if ($(elem).children("h2, h3").text().match(junkRegex)) {
+          $(elem).remove();
+        }
+      });
+    }
   },
   science: {
-    goodClass: "#abstracts #bodymatter",
+    goodClass: "#bodymatter #abstracts",
     toRemove:
       'aside, .figure-wrap, section[role="doc-acknowledgments"], a, h1, h2, h3, h4, section[data-type*="ethod"]',
     doiTag: "meta[name=dc.Identifier][scheme=doi]"
@@ -72,7 +88,8 @@ export const cleaners: Record<string, Cleaner> = {
     goodClass: "#abstracts #bodymatter",
     toRemove:
       ".signup-alert-ad, .figure-wrap, a, #glossary, #backmatter, #footnotes, section[data-type*=ethods], h1, h2, h3",
-    doiTag: "meta[name=dc.Identifier][scheme=doi]"
+    doiTag: "meta[name=dc.Identifier][scheme=doi]",
+    urlConverter: (url: string) => url.replace("/abs", "/full")
     // runFunc: ($: cheerio.CheerioAPI) => {
     //   $("section").each((i, elem) => {
     //     if (
@@ -143,12 +160,24 @@ export const cleaners: Record<string, Cleaner> = {
     toRemove:
       "a, h2, .floatDisplay, .reference-citations, .refs, .article-info, figure, figcaption, style, .left-side-nav, .figure-viewer, [id~=app]",
     doiTag: "meta[name=citation_doi]",
-    runFunc: cellCleaner
+    runFunc: cellCleaner,
+    urlConverter: (url: string) => {
+      const match = url.match(
+        /^https:\/\/www\.cell\.com\/[a-z\-/]+\/(fulltext|pdf|abs)\/(S.+)(\.pdf)?$/i
+      );
+      if (match) {
+        return `https://www.sciencedirect.com/science/article/pii/${match[2].replace(
+          /\W+/g,
+          ""
+        )}`;
+      }
+      throw new Error("This is not a valid Cell Press URL.");
+    }
   },
   oup: {
     goodClass: 'div[data-widgetname="ArticleFulltext"]',
     toRemove:
-      "[class*=meta], a, h1, h2, h3, h4, .ref-list, .authorNotes-section-title, .footnote, .copyright, .license, .fig, [class^=table]",
+      "[class*=meta], a, h1, h2, h3, h4, .ref-list, .authorNotes-section-title, .footnote, .copyright, .license, .fig, [class^=table], p:contains(approved), p:contains(grateful), p:contains(grant)",
     doiTag: "meta[name=citation_doi]",
     runFunc: ($: cheerio.CheerioAPI) => {
       $(".section-title").each((i, elem) => {
@@ -188,7 +217,8 @@ export const cleaners: Record<string, Cleaner> = {
           $(elem).remove();
         }
       });
-    }
+    },
+    urlConverter: (url: string) => (url.endsWith(".full") ? url : url + ".full")
   },
   annualreviews: {
     goodClass: ".article-content",
@@ -202,8 +232,14 @@ export const cleaners: Record<string, Cleaner> = {
           $(elem).remove();
         }
       });
+    },
+    urlConverter: (url: string) => {
+      const match = url.match(/^(.*annualreviews\.org\/doi\/)(abs\/)?(.*)$/i);
+      if (!match) throw new Error("This is not a valid Annual Reviews URL.");
+      return url.match("full") ? url : match[1] + "full/" + match[3];
     }
   },
+
   physiology: {
     goodClass: ".hlFld-Abstract .hlFld-Fulltext",
     toRemove: "figure, .ack, .tableToggle, .figure-extra, a, h1, h2, h3, h4",
@@ -239,19 +275,38 @@ export const cleaners: Record<string, Cleaner> = {
     toRemove:
       ".c-article__sub-heading, .c-article-subject-list, [data-test=chapter-cobranding-and-download], figure, a, h1, h2, h3, h4",
     doiTag: "meta[name=citation_doi]"
+  },
+  wiley: {
+    goodClass: ".article__body",
+    toRemove: "figure, a, h1, h2, h3, h4, .feature, .accordion, .cited-by",
+    doiTag: "meta[name=dc.identifier]"
   }
 } as const;
 
 function sciencedirectCleaner($: cheerio.CheerioAPI) {
   $("section").each((i, elem) => {
     if (
-      $(elem).has(junkWords.map((x) => `h2:contains("${x}")`).join(", "))
-        .length ||
-      $(elem).has(junkWords.map((x) => `h3:contains("${x}")`).join(", "))
-        .length ||
-      $(elem).has(junkWords.map((x) => `h4:contains("${x}")`).join(", ")).length
-    ) {
+      $(elem).has(junkWords.map((x) => `h2:contains("${x}")`).join(", ")).length
+     && $(elem).children("h2").text().split(" ").length < 6 ) {
+      console.log("h2", $(elem).children("h2").text());
       $(elem).remove();
+      return;
+    }
+
+    if (
+      $(elem).has(junkWords.map((x) => `h3:contains("${x}")`).join(", ")).length
+    && $(elem).children("h3").text().split(" ").length < 6 ) {
+      console.log("h3", $(elem).children("h3").text());
+      $(elem).remove();
+      return;
+    }
+
+    if (
+      $(elem).has(junkWords.map((x) => `h4:contains("${x}")`).join(", ")).length
+    && $(elem).children("h4").text().split(" ").length < 6 ) {
+      console.log("h4", $(elem).children("h4").text());
+      $(elem).remove();
+      return;
     }
   });
 }

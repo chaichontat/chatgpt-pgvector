@@ -88,7 +88,7 @@ const DocsPage: NextPage<Props> = () => {
       />
       <div className="flex flex-col items-center justify-center min-h-screen py-2 mx-auto">
         <main className="flex flex-col items-center justify-center flex-1 w-full min-h-screen px-4 py-2 mx-auto mt-12 text-center sm:mt-20">
-          <h1 className="max-w-3xl text-4xl font-bold mb-2">
+          <h1 className="text-neutral-200 max-w-3xl text-4xl font-bold mb-2">
             Ask your exocortex anything<sup>*</sup> about science!
           </h1>
           <div className="w-full max-w-2xl flex flex-col items-center">
@@ -97,7 +97,7 @@ const DocsPage: NextPage<Props> = () => {
                 value={userQ}
                 onChange={(e) => setUserQ(e.target.value)}
                 rows={4}
-                className="w-full p-2 mt-5 mb-2 border rounded-md shadow-md bg-neutral border-neutral-focus "
+                className="text-neutral-100 w-full p-2 mt-5 mb-2 border rounded-md shadow-md bg-neutral border-neutral-focus "
                 placeholder={
                   "e.g. Describe the role of Pax6 and its role in neural progenitor cells in detail."
                 }

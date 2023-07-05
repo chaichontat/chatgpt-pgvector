@@ -38,7 +38,7 @@ module.exports = {
     logs: true,
     rtl: false,
     prefix: "",
-    darkTheme: "night",
+    // darkTheme: "night",
   },
 
   theme: {
