@@ -60,7 +60,5 @@ export default async function handle(
     authors: r.authors?.[0].name.split(" ").at(-1)
   }));
 
-  console.log("out", out);
-
   return res.status(200).json(out);
 }

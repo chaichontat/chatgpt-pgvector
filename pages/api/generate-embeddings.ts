@@ -187,6 +187,7 @@ async function gotoPage(page: Page, url: string) {
   stream.log("Running", url, "\n");
   await page.goto(url, { waitUntil: "networkidle0", timeout: 10000 });
   console.log("network idle");
+  await new Promise((r) => setTimeout(r, 1000));
   const actualURL = page.url();
   let hostname = extractHostname(actualURL) as keyof typeof cleaners;
   if (!(hostname in cleaners)) {
@@ -285,7 +286,7 @@ async function run(browser: Browser, url: string) {
   fs.writeFileSync("output/" + doiFile + ".txt", articleText);
 
   const metadata = await uploadMetadata(supabaseClient, doi);
-    return { chunks: slice(metadata.title, articleText, 150), doi }
+    return { chunks: slice(metadata.title, articleText, 80), doi }
 }
 
 function countWords(str: string) {

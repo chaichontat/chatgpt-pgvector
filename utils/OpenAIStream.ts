@@ -49,7 +49,6 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
           }
           try {
             const json = JSON.parse(data);
-            // console.log("JSON.parse(data): ", json);
             const content = json.choices[0].delta.content;
             // console.log("content: ", content);
             const queue = encoder.encode(content);
@@ -72,5 +71,5 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
     }
   });
 
-  return stream;
+  return res.status === 200 ? stream: null;
 }

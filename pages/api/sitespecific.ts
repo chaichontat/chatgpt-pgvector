@@ -40,12 +40,13 @@ const junkWords = [
   "nformation",
   "ompliance",
   "thical",
-  "appendi",
+  "ppendi",
   "statement",
   "sponsorship",
   "version",
   "summary",
-  "peer review"
+  "peer review",
+  "Change history"
 ];
 
 const junkRegex = new RegExp(junkWords.join("|"), "gi");
@@ -54,7 +55,7 @@ export const cleaners: Record<string, Cleaner> = {
   nature: {
     goodClass: ".main-content section[data-title=Abstract]",
     toRemove:
-      'a:not([href*="Glos"]), h2, h3, h4, sup, .c-article-table, .c-article-section__figure, section[data-title*="ethods"], .c-article-box__button-text, .c-article-box',
+      'a:not([href*="Glos"]), h2, h3, h4, .c-article-table, .c-article-section__figure, section[data-title*="ethods"], .c-article-box__button-text, .c-article-box',
     doiTag: "meta[name*=doi]"
   },
   sciencedirect: {
@@ -109,21 +110,9 @@ export const cleaners: Record<string, Cleaner> = {
     toRemove:
       ".c-article-header, h2, a, figure, #MagazineFulltextArticleBodySuffix, " +
       genAvoidSelection(
-        [
-          "Methods",
-          "Materials and methods",
-          "Availability of data and materials",
-          "Acknowledgements",
-          "Acknowledgments",
-          "unding",
-          "declarations",
-          "information",
-          "Rights",
-          "About",
-          "history",
-          "bbreviations",
-          "Additional"
-        ],
+
+          junkWords
+        ,
         "data-title"
       ),
     doiTag: "meta[name=citation_doi]"
@@ -223,7 +212,7 @@ export const cleaners: Record<string, Cleaner> = {
   annualreviews: {
     goodClass: ".article-content",
     toRemove:
-      '[class*=word], .article-tools, .figure-container, script, [class*=equation], sup, .formulaLabel, .ack, .lit-cited, .ar-modal, .mfp-hide, a:not([href*=dl]), h1, h2, h3, h4, p:contains("received funding"), p:contains("affiliation"), p:contains("cofounder"), p:contains("consultant")',
+      '[class*=word], .article-tools, .figure-container, script, [class*=equation], .formulaLabel, .ack, .lit-cited, .ar-modal, .mfp-hide, a:not([href*=dl]), h1, h2, h3, h4, p:contains("received funding"), p:contains("affiliation"), p:contains("cofounder"), p:contains("consultant")',
     doiTag: "meta[name=dc.Identifier]",
     runFunc: ($: cheerio.CheerioAPI) => {
       $("p").each((i, elem) => {
@@ -280,6 +269,29 @@ export const cleaners: Record<string, Cleaner> = {
     goodClass: ".article__body",
     toRemove: "figure, a, h1, h2, h3, h4, .feature, .accordion, .cited-by",
     doiTag: "meta[name=dc.identifier]"
+  },
+  acs: {
+    goodClass: ".articleBody_abstractText .NLM_sec",
+    toRemove: "figure, a, h1, h2, h3, h4, .NLM_table-wrap, .NLM_table-wrap-foot, table, .paneContainer",
+    doiTag: "meta[name=dc.Identifier]",
+    runFunc: ($: cheerio.CheerioAPI) => {
+      $(".NLM_sec").each((i, elem) => {
+        if (
+          $(elem).has(junkWords.map((x) => `h2:contains("${x}")`).join(", "))
+            .length
+        ) {
+          $(elem).remove();
+        }
+      });
+    }
+  },
+  aps: {
+    goodClass: ".article-section",
+    toRemove: "figure, a, h1, h2, h3, h4, h5",
+    doiTag: "meta[name=citation_doi]",
+    urlConverter: (url: string) => {
+     return url + "#fulltext"
+    }
   }
 } as const;
 
